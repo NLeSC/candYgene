@@ -6,9 +6,10 @@ candYgene
 * [OntoSPy](https://github.com/lambdamusic/OntoSPy)
 * [nanopub-java](https://github.com/Nanopublication/nanopub-java)
 * [gff2RDF](https://github.com/PBR/gff2RDF)
-* GFF/GTF tools: [[1]](https://pypi.python.org/pypi/gffutils), [[2]](https://github.com/modENCODE-DCC/validator), [[3]](http://gmod.org/wiki/GFF3)
+* GFF/GTF tools: [gffutils](https://pypi.python.org/pypi/gffutils), [validator](https://github.com/modENCODE-DCC/validator), [GFF3 spec](http://gmod.org/wiki/GFF3)
 * [sparql-vcf](https://github.com/JervenBolleman/sparql-vcf)
 * [Marker2Sequence](https://github.com/PBR/Marker2Sequence)
+* [Protege](https://github.com/protegeproject/protege) & [tutorial](https://github.com/geneontology/protege-tutorial)
 
 **Controlled Vocabularies & Ontologies**
 * [Feature Annotation Location Description Ontology (FALDO)](https://github.com/JervenBolleman/FALDO)
