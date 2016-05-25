@@ -5,10 +5,15 @@ candYgene
 * [RDFLib](https://github.com/RDFLib)
 * [OntoSPy](https://github.com/lambdamusic/OntoSPy)
 * [nanopub-java](https://github.com/Nanopublication/nanopub-java)
-* [gff2RDF](https://github.com/PBR/gff2RDF)
-* GFF/GTF tools: [gffutils](https://pypi.python.org/pypi/gffutils), [validator](https://github.com/modENCODE-DCC/validator), [GFF3 spec](http://gmod.org/wiki/GFF3)
-* VCF tools: [vcf-kit](https://github.com/AndersenLab/vcf-kit), [vcftoolbox](https://github.com/moonso/vcftoolbox)
-* [sparql-vcf](https://github.com/JervenBolleman/sparql-vcf)
+* [GFF](http://gmod.org/wiki/GFF3) tools:
+  [gffutils](https://pypi.python.org/pypi/gffutils),
+  [validator](https://github.com/modENCODE-DCC/validator),
+  [gff2RDF](https://github.com/PBR/gff2RDF)
+* [VCF](http://samtools.github.io/hts-specs/VCFv4.3.pdf) tools:
+  [vcf-kit](https://github.com/AndersenLab/vcf-kit),
+  [vcftoolbox](https://github.com/moonso/vcftoolbox),
+  [vcftools](https://vcftools.github.io/),
+  [Oracle's VCF loader](https://docs.oracle.com/cd/E27594_02/doc.101/e27509/resultdata.htm#CIAEBGAH), [sparql-vcf](https://github.com/JervenBolleman/sparql-vcf)
 * [Marker2Sequence](https://github.com/PBR/Marker2Sequence)
 * [Protege](https://github.com/protegeproject/protege) & [tutorial](https://github.com/geneontology/protege-tutorial)
 
