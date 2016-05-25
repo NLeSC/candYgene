@@ -11,7 +11,7 @@ candYgene
 * [Marker2Sequence](https://github.com/PBR/Marker2Sequence)
 * [Protege](https://github.com/protegeproject/protege) & [tutorial](https://github.com/geneontology/protege-tutorial)
 
-**Controlled Vocabularies & Ontologies**
+**Controlled vocabularies & ontologies**
 * [Feature Annotation Location Description Ontology (FALDO)](https://github.com/JervenBolleman/FALDO)
 * [Genomic Feature and Variation Ontology (GFVO)](https://github.com/BioInterchange/Ontologies)
 * [Sequece Ontology (SO)](http://www.sequenceontology.org/)
@@ -21,6 +21,13 @@ candYgene
 * [Biointerchange](https://www.codamono.com/biointerchange/)
 * [EDAM](https://github.com/edamontology/edamontology)
 * [Crop Ontology](http://www.cropontology.org/)
-* [OLS](http://www.ebi.ac.uk/ols/)
+* [Ontology Lookup Service (OLS)](http://www.ebi.ac.uk/ols/)
 * [OBO Foundry](http://www.obofoundry.org/)
 * [BioPortal](https://bioportal.bioontology.org/)
+
+**Molecular databases**
+* [@EBI](http://ftp.ebi.ac.uk/pub/databases/)
+* [@NCBI](http://ftp.ncbi.nlm.nih.gov/)
+* [@GenomeNet](http://www.genome.jp/)
+* [UniProtKB](http://www.uniprot.org/downloads)
+* [Ensembl Plants](http://plants.ensembl.org/)
