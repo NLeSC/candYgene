@@ -39,3 +39,4 @@ candYgene
 * [Gramene](http://gramene.org/)
 * [UniProtKB](http://www.uniprot.org/downloads)
 * [Ensembl Plants](http://plants.ensembl.org/)
+* [Plant Reactome](http://plantreactome.gramene.org/)
