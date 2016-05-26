@@ -5,6 +5,7 @@ candYgene
 * [RDFLib](https://github.com/RDFLib)
 * [OntoSPy](https://github.com/lambdamusic/OntoSPy)
 * [nanopub-java](https://github.com/Nanopublication/nanopub-java)
+* [Redland RDF](http://librdf.org/)
 * [GFF](http://gmod.org/wiki/GFF3) tools:
   [gffutils](https://pypi.python.org/pypi/gffutils),
   [validator](https://github.com/modENCODE-DCC/validator),
