@@ -32,9 +32,10 @@ candYgene
 * [BioPortal](https://bioportal.bioontology.org/)
 
 **Molecular databases**
-* [@EBI](http://ftp.ebi.ac.uk/pub/databases/)
-* [@NCBI](http://ftp.ncbi.nlm.nih.gov/)
-* [@GenomeNet](http://www.genome.jp/)
-* [@Sol Genomics Network](https://solgenomics.net/)
+* [EBI's collection](http://ftp.ebi.ac.uk/pub/databases/)
+* [NCBI's collection](http://ftp.ncbi.nlm.nih.gov/)
+* [GenomeNet](http://www.genome.jp/)
+* [Sol Genomics Network (SGN)](https://solgenomics.net/)
+* [Gramene](http://gramene.org/)
 * [UniProtKB](http://www.uniprot.org/downloads)
 * [Ensembl Plants](http://plants.ensembl.org/)
