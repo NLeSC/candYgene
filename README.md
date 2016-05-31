@@ -11,6 +11,7 @@ candYgene
   [validator](https://github.com/modENCODE-DCC/validator),
   [gff2RDF](https://github.com/PBR/gff2RDF)
 * [VCF](http://samtools.github.io/hts-specs/VCFv4.3.pdf) tools:
+  [PyVCF](https://github.com/jamescasbon/PyVCF),
   [vcf-kit](https://github.com/AndersenLab/vcf-kit),
   [vcftoolbox](https://github.com/moonso/vcftoolbox),
   [vcftools](https://vcftools.github.io/),
