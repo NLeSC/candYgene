@@ -7,7 +7,7 @@ candYgene
 * [nanopub-java](https://github.com/Nanopublication/nanopub-java)
 * [Redland RDF](http://librdf.org/)
 * [GFF](http://gmod.org/wiki/GFF3) tools:
-  [gffutils](https://pypi.python.org/pypi/gffutils),
+  [gffutils](https://github.com/daler/gffutils),
   [validator](https://github.com/modENCODE-DCC/validator),
   [gff2RDF](https://github.com/PBR/gff2RDF)
 * [VCF](http://samtools.github.io/hts-specs/VCFv4.3.pdf) tools:
