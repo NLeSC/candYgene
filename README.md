@@ -19,6 +19,7 @@ candYgene
   [Oracle's VCF loader](https://docs.oracle.com/cd/E27594_02/doc.101/e27509/resultdata.htm#CIAEBGAH), [sparql-vcf](https://github.com/JervenBolleman/sparql-vcf)
 * [Marker2Sequence](https://github.com/PBR/Marker2Sequence)
 * [Protege](https://github.com/protegeproject/protege) & [tutorial](https://github.com/geneontology/protege-tutorial)
+* [GA4GH Genomics API](https://github.com/ga4gh)
 
 **Controlled vocabularies & ontologies**
 * [Feature Annotation Location Description Ontology (FALDO)](https://github.com/JervenBolleman/FALDO)
