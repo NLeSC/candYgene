@@ -8,16 +8,17 @@ References:
 Usage:
   siga.py -h | --help
   siga.py -v | --version
-  siga.py [-f FORMAT] [-d FILE] FILE...
+  siga.py [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
 
 Arguments:
-  FILE...                     Input file(s) in GFF.
+  GFF_FILE...      Input file(s) in GFF (versions 2/3).
 
 Options:
   -h, --help
   -v, --version
-  -f FORMAT, --format=FORMAT  Select RDF serialization/format [default: turtle].
-  -d FILE, --database=FILE    Populate GFF database(s) in SQLite.
+  -d DB_FILE       Populate GFF database(s) in SQLite.
+  -e DB_FILE_EXT   Database file extension [default: .db].
+  -o FORMAT        Select RDF serialization/format [default: turtle].
 
 """
 
@@ -37,12 +38,16 @@ if __name__ == '__main__':
     args = docopt(__doc__, version=__version__)
     print(args)
 
-    db_file = args['--database']
-    for gff_file in args['FILE']:
+    db_file = args['-d']
+    for gff_file in args['GFF_FILE']:
         # generate one db per GFF file
-        if args['--database'] is None:
+        if args['-d'] is None:
             base_name = os.path.splitext(gff_file)[0]
-            db_file = base_name + '.sqlite'
+            file_ext = args['-e']
+            char = '.'
+            if file_ext.startswith(char) is False:
+                file_ext = char + file_ext
+            db_file = base_name + file_ext
             db = gff.create_db(gff_file, db_file, force=True)
 
         # import all GFF files into a single db
