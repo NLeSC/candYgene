@@ -27,6 +27,8 @@ from docopt import docopt
 
 import os
 import gffutils as gff
+import sqlite3 as sql
+from gffutils import feature
 
 __author__  = 'Arnold Kuzniar'
 __version__ = 0.1
@@ -36,24 +38,35 @@ __license__ = 'Apache License, Version 2.0'
 
 if __name__ == '__main__':
     args = docopt(__doc__, version=__version__)
-    print(args)
+    #print(args)
 
-    db_file = args['-d']
+    def normalize_filext(s):
+        dot = '.'
+        if s.startswith(dot) is False:
+            s = dot + s
+        return s
+
+    #def print_all_features(db):
+    #    for ft in db.all_features():
+    #        print(ft)
+
     for gff_file in args['GFF_FILE']:
-        # generate one db per GFF file
-        if args['-d'] is None:
-            base_name = os.path.splitext(gff_file)[0]
-            file_ext = args['-e']
-            char = '.'
-            if file_ext.startswith(char) is False:
-                file_ext = char + file_ext
-            db_file = base_name + file_ext
-            db = gff.create_db(gff_file, db_file, force=True)
-
-        # import all GFF files into a single db
-        elif os.path.exists(db_file) is True:
-            db = gff.FeatureDB(db_file)
-            db.update(gff_file)
+        if args['-d']:
+            # populate a single db from all GFF files
+            db_file = args['-d']
+            if os.path.exists(db_file):
+                db = gff.FeatureDB(db_file)
+                db.update(gff_file)
+            else:
+                db = gff.create_db(gff_file, db_file, force=False)
         else:
-            db = gff.create_db(gff_file, db_file, force=False)
-
+            # populate one db per GFF file
+            base_name = os.path.splitext(gff_file)[0]
+            db_file = base_name + normalize_filext(args['-e'])
+            try:
+                db = gff.create_db(gff_file, db_file, force=False)
+                #print_all_features(db)
+            except sql.OperationalError:
+                raise IOError("Database file '%s' already exists." % db_file)
+            except ValueError:
+                raise IOError("GFF file '%s' not found." % gff_file)
