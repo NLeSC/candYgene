@@ -28,7 +28,6 @@ from docopt import docopt
 import os
 import gffutils as gff
 import sqlite3 as sql
-from gffutils import feature
 
 __author__  = 'Arnold Kuzniar'
 __version__ = 0.1
