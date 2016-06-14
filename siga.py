@@ -8,7 +8,7 @@ References:
 Usage:
   siga.py -h | --help
   siga.py -v | --version
-  siga.py [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
+  siga.py [-V ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF (versions 2/3).
@@ -16,9 +16,10 @@ Arguments:
 Options:
   -h, --help
   -v, --version
+  -V, --verbose    Use for debugging.
   -d DB_FILE       Populate GFF database(s) in SQLite.
-  -e DB_FILE_EXT   Database file extension [default: .db].
-  -o FORMAT        Select RDF serialization/format [default: turtle].
+  -e DB_FILE_EXT   Database file extension. [default: .db].
+  -o FORMAT        Select RDF serialization/format. [default: turtle]
 
 """
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
             base_name = os.path.splitext(gff_file)[0]
             db_file = base_name + normalize_filext(args['-e'])
             try:
-                db = gff.create_db(gff_file, db_file, force=False)
+                db = gff.create_db(gff_file, db_file, verbose=args['--verbose'], force=False)
                 #print_all_features(db)
             except sql.OperationalError:
                 raise IOError("Database file '%s' already exists." % db_file)
