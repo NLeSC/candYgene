@@ -26,13 +26,12 @@ Options:
 
 from __future__ import print_function
 from docopt import docopt
+from rdflib import Graph, URIRef, Literal
+from rdflib.namespace import Namespace, RDF, RDFS, XSD
 
 import os
 import gffutils as gff
 import sqlite3 as sql
-
-from rdflib import Graph, URIRef, Literal
-from rdflib.namespace import Namespace, RDF, RDFS, XSD
 
 __author__  = 'Arnold Kuzniar'
 __version__ = '0.1.1'
@@ -52,11 +51,13 @@ def triplify(db, format):
 
     # define additional namespaces
     SO = Namespace('http://purl.obolibrary.org/obo/') # Sequence Ontology (Feature Annotation)
+    FALDO = Namespace('http://biohackathon.org/resource/faldo/')
     BASE = Namespace('https://solgenomics.net/search/quick?term=') # so far no better solution to resolve features
 
     # bind prefixes to namespaces
     g = Graph()
     g.bind('so', SO)
+    g.bind('faldo', FALDO)
     g.bind(None, BASE)
 
     # map feature types to SO accessions
@@ -68,16 +69,18 @@ def triplify(db, format):
                  five_prime_UTR = 'SO_0000204',
                  three_prime_UTR = 'SO_0000205')
 
-    query = 'SELECT * FROM features'
-    for row in db.execute(query):
-        ft = row['featuretype']
-        id = row['id'].replace(ft + ':', '')
+    for feature in db.all_features():
+        ft = feature.featuretype
+        id = feature.id.replace(ft + ':', '')
         if ft in ft2id:
             s = URIRef(BASE + id)
             p = URIRef(RDF.type)
             o = URIRef(SO + ft2id[ft])
             g.add( (s, p, o) )
             g.add( (s, RDFS.label, Literal(ft, datatype=XSD.string)))
+            g.add( (s, RDF.type, FALDO.Region) )
+            g.add( (s, FALDO.begin, Literal(feature.start, datatype=XSD.nonNegativeInteger)) )
+            g.add( (s, FALDO.end, Literal(feature.end, datatype=XSD.nonNegativeInteger)) )
 
     outfile = os.path.splitext(db.dbfn)[0] + format2fext[format]
     with open(outfile, 'w') as fout:
@@ -88,6 +91,7 @@ if __name__ == '__main__':
     #print(args)
 
     format = args['-o']
+    debug = args['--verbose']
     fk_constraints = 'ON' if args['-i'] is True else 'OFF'
     pragmas = dict(foreign_keys=fk_constraints)
 
@@ -100,13 +104,13 @@ if __name__ == '__main__':
                 db = gff.FeatureDB(db_file)
                 db.update(gff_file)
             else:
-                db = gff.create_db(gff_file, db_file, pragmas=pragmas, force=False)
+                db = gff.create_db(gff_file, db_file, verbose=debug, pragmas=pragmas, force=False)
         else:
             # populate one db per GFF file
             base_name = os.path.splitext(gff_file)[0]
             db_file = base_name + normalize_filext(args['-e'])
             try:
-                db = gff.create_db(gff_file, db_file, verbose=args['--verbose'], pragmas=pragmas, force=False)
+                db = gff.create_db(gff_file, db_file, verbose=debug, pragmas=pragmas, force=False)
                 triplify(db, format)
             except sql.OperationalError:
                 raise IOError("Database file '%s' already exists." % db_file)
