@@ -8,7 +8,7 @@ References:
 Usage:
   siga.py -h | --help
   siga.py -v | --version
-  siga.py [-V ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
+  siga.py [-iV ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF (versions 2/3).
@@ -19,6 +19,7 @@ Options:
   -V, --verbose    Use for debugging.
   -d DB_FILE       Populate GFF database(s) in SQLite.
   -e DB_FILE_EXT   Database file extension. [default: .db].
+  -i               Check the referential integrity of database(s).
   -o FORMAT        Select RDF serialization/format. [default: turtle]
 
 """
@@ -49,6 +50,8 @@ if __name__ == '__main__':
     #def print_all_features(db):
     #    for ft in db.all_features():
     #        print(ft)
+    fk_constraints = 'ON' if args['-i'] is True else 'OFF'
+    pragmas = dict(foreign_keys=fk_constraints)
 
     for gff_file in args['GFF_FILE']:
         if args['-d']:
@@ -58,15 +61,17 @@ if __name__ == '__main__':
                 db = gff.FeatureDB(db_file)
                 db.update(gff_file)
             else:
-                db = gff.create_db(gff_file, db_file, force=False)
+                db = gff.create_db(gff_file, db_file, pragmas=pragmas, force=False)
         else:
             # populate one db per GFF file
             base_name = os.path.splitext(gff_file)[0]
             db_file = base_name + normalize_filext(args['-e'])
             try:
-                db = gff.create_db(gff_file, db_file, verbose=args['--verbose'], force=False)
+                db = gff.create_db(gff_file, db_file, verbose=args['--verbose'], pragmas=pragmas, force=False)
                 #print_all_features(db)
             except sql.OperationalError:
                 raise IOError("Database file '%s' already exists." % db_file)
             except ValueError:
                 raise IOError("GFF file '%s' not found." % gff_file)
+            except sql.IntegrityError, e:
+                raise IOError("%s in database '%s'." % (e, db_file))
