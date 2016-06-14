@@ -35,7 +35,7 @@ from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import Namespace, RDF, RDFS, XSD
 
 __author__  = 'Arnold Kuzniar'
-__version__ = 0.1.1
+__version__ = '0.1.1'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
