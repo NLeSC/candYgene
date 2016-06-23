@@ -8,7 +8,7 @@ References:
 Usage:
   siga.py -h | --help
   siga.py -v | --version
-  siga.py [-iV ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
+  siga.py [-cV ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF (versions 2/3).
@@ -19,8 +19,8 @@ Options:
   -V, --verbose    Use for debugging.
   -d DB_FILE       Populate GFF database(s) in SQLite.
   -e DB_FILE_EXT   Database file extension. [default: .db].
-  -i               Check the referential integrity of database(s).
   -o FORMAT        Select RDF graph serialization: turtle (.ttl), n3 (.n3) or xml (.rdf). [default: turtle]
+  -c               Check the referential integrity of database(s).
 
 """
 
@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
     format = args['-o']
     debug = args['--verbose']
-    fk_constraints = 'ON' if args['-i'] is True else 'OFF'
+    fk_constraints = 'ON' if args['-c'] is True else 'OFF'
     pragmas = dict(foreign_keys=fk_constraints)
 
     # loop through GFF files, populate GFF databases and write RDF graphs
