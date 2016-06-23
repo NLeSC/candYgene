@@ -26,7 +26,7 @@ Options:
 
 from __future__ import print_function
 from docopt import docopt
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, URIRef, Literal, BNode
 from rdflib.namespace import Namespace, RDF, RDFS, XSD
 
 import os
@@ -45,13 +45,16 @@ def normalize_filext(s):
         s = dot + s
     return s
 
+#def normalize_feature_id(id):
+#    return replace(id + ':', '')
+
 def triplify(db, format):
     format2fext = dict(turtle = '.ttl', xml = '.rdf', n3 = '.n3')
     assert(format in format2fext), "Unsupported RDF serialization '%s'." % format
 
     # define additional namespaces
     SO = Namespace('http://purl.obolibrary.org/obo/') # Sequence Ontology (Feature Annotation)
-    FALDO = Namespace('http://biohackathon.org/resource/faldo/')
+    FALDO = Namespace('http://biohackathon.org/resource/faldo#')
     BASE = Namespace('https://solgenomics.net/search/quick?term=') # so far no better solution to resolve features
 
     # bind prefixes to namespaces
@@ -60,27 +63,49 @@ def triplify(db, format):
     g.bind('faldo', FALDO)
     g.bind(None, BASE)
 
-    # map feature types to SO accessions
-    ft2id = dict(gene = 'SO_0000704',
-                 mRNA = 'SO_0000234',
-                 CDS = 'SO_0000316',
-                 exon = 'SO_0000147',
-                 intron = 'SO_0000188',
-                 five_prime_UTR = 'SO_0000204',
-                 three_prime_UTR = 'SO_0000205')
+    # map feature types to Sequence Ontology terms
+    feature2onto = dict(gene = SO.SO_0000704,
+                        mRNA = SO.SO_0000234,
+                        CDS  = SO.SO_0000316,
+                        exon = SO.SO_0000147,
+                        intron = SO.SO_0000188,
+                        five_prime_UTR = SO.SO_0000204,
+                        three_prime_UTR = SO.SO_0000205)
 
     for feature in db.all_features():
-        ft = feature.featuretype
-        id = feature.id.replace(ft + ':', '')
-        if ft in ft2id:
-            s = URIRef(BASE + id)
+        try:
+            s = URIRef(BASE + feature.id)
             p = URIRef(RDF.type)
-            o = URIRef(SO + ft2id[ft])
+            o = URIRef(feature2onto[feature.featuretype])
+            start = BNode()
+            end = BNode()
+            strand = FALDO.Position
+
+            if feature.strand is '+':
+                strand = FALDO.ForwardStrandPosition
+            elif feature.strand is '-':
+                strand = FALDO.ReverseStrandPosition
+            elif feature.strand is '?':
+                strand = FALDO.StrandedPosition
+
             g.add( (s, p, o) )
-            g.add( (s, RDFS.label, Literal(ft, datatype=XSD.string)))
+            g.add( (s, RDFS.label, Literal(feature.featuretype, datatype=XSD.string)) )
             g.add( (s, RDF.type, FALDO.Region) )
-            g.add( (s, FALDO.begin, Literal(feature.start, datatype=XSD.nonNegativeInteger)) )
-            g.add( (s, FALDO.end, Literal(feature.end, datatype=XSD.nonNegativeInteger)) )
+
+            # add feature start/end positions
+            g.add( (s, FALDO.begin, start) )
+            g.add( (start, RDF.type, FALDO.ExactPosition) )
+            g.add( (start, RDF.type, strand) )
+            g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.nonNegativeInteger)) )
+            g.add( (start, FALDO.reference, Literal(feature.seqid, datatype=XSD.string)) )
+            g.add( (s, FALDO.begin, end) )
+            g.add( (end, RDF.type, FALDO.ExactPosition) )
+            g.add( (end, RDF.type, strand) )
+            g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.nonNegativeInteger)) )
+            g.add( (end, FALDO.reference, Literal(feature.seqid, datatype=XSD.string)) )
+
+        except KeyError:
+            pass
 
     outfile = os.path.splitext(db.dbfn)[0] + format2fext[format]
     with open(outfile, 'w') as fout:
