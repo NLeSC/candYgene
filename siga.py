@@ -34,7 +34,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -63,14 +63,18 @@ def triplify(db, format):
     g.bind('faldo', FALDO)
     g.bind(None, BASE)
 
-    # map feature types to Sequence Ontology terms
-    feature2onto = dict(gene = SO.SO_0000704,
-                        mRNA = SO.SO_0000234,
-                        CDS  = SO.SO_0000316,
-                        exon = SO.SO_0000147,
-                        intron = SO.SO_0000188,
-                        five_prime_UTR = SO.SO_0000204,
-                        three_prime_UTR = SO.SO_0000205)
+    # map feature types and strandedness to ontology terms
+    feature2onto = {'gene' : SO.SO_0000704,
+                    'mRNA' : SO.SO_0000234,
+                    'CDS'  : SO.SO_0000316,
+                    'exon' : SO.SO_0000147,
+                    'intron' : SO.SO_0000188,
+                    'five_prime_UTR' : SO.SO_0000204,
+                    'three_prime_UTR' : SO.SO_0000205,
+                    '+' : FALDO.ForwardStrandPosition,
+                    '-' : FALDO.ReverseStrandPosition,
+                    '?' : FALDO.StrandedPosition,
+                    '.' : FALDO.Position}
 
     for feature in db.all_features():
         try:
@@ -79,20 +83,16 @@ def triplify(db, format):
             o = URIRef(feature2onto[feature.featuretype])
             start = BNode()
             end = BNode()
-            strand = FALDO.Position
 
-            if feature.strand is '+':
-                strand = FALDO.ForwardStrandPosition
-            elif feature.strand is '-':
-                strand = FALDO.ReverseStrandPosition
-            elif feature.strand is '?':
-                strand = FALDO.StrandedPosition
+            if feature.strand not in feature2onto:
+                raise ValueError("Incorrect strand information for feature ID '%s'." % feature.id)
+            strand = feature2onto[feature.strand]
 
             g.add( (s, p, o) )
             g.add( (s, RDFS.label, Literal(feature.featuretype, datatype=XSD.string)) )
             g.add( (s, RDF.type, FALDO.Region) )
 
-            # add feature start/end positions
+            # add feature start/end positions and strand info
             g.add( (s, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
@@ -136,13 +136,13 @@ if __name__ == '__main__':
             db_file = base_name + normalize_filext(args['-e'])
             try:
                 db = gff.create_db(gff_file, db_file, verbose=debug, pragmas=pragmas, force=False)
-                triplify(db, format)
             except sql.OperationalError:
                 raise IOError("Database file '%s' already exists." % db_file)
             except ValueError:
                 raise IOError("GFF file '%s' not found." % gff_file)
             except sql.IntegrityError, e:
                 raise IOError("%s in database '%s'." % (e, db_file))
+            triplify(db, format)
 
     if args['-d']:
         db_file = args['-d']
