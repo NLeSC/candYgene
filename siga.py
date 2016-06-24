@@ -1,5 +1,6 @@
 """
-Generate semantically interoperable genome annotations from GFF[1] files according to the RDF[2] specification.
+SIGA.py is a command-line tool to generate Semantically Interoperable Genome Annotations from
+GFF files [1] according to the RDF specification [2].
 
 References:
 [1] Generic Feature Format specification, http://www.sequenceontology.org/gff3.shtml
@@ -11,15 +12,15 @@ Usage:
   siga.py [-cV ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
 
 Arguments:
-  GFF_FILE...      Input file(s) in GFF (versions 2/3).
+  GFF_FILE...      Input file(s) in GFF versions 2 or 3.
 
 Options:
   -h, --help
   -v, --version
   -V, --verbose    Use for debugging.
-  -d DB_FILE       Populate GFF database(s) in SQLite.
+  -d DB_FILE       Populate a single SQLite database from one or more GFF files.
   -e DB_FILE_EXT   Database file extension. [default: .db].
-  -o FORMAT        Select RDF graph serialization: turtle (.ttl), n3 (.n3) or xml (.rdf). [default: turtle]
+  -o FORMAT        Select RDF serialization format: turtle (.ttl), n3 (.n3) or xml (.rdf). [default: turtle]
   -c               Check the referential integrity of database(s).
 
 """
@@ -120,7 +121,7 @@ if __name__ == '__main__':
     fk_constraints = 'ON' if args['-c'] is True else 'OFF'
     pragmas = dict(foreign_keys=fk_constraints)
 
-    # loop through GFF files, populate GFF databases and write RDF graphs
+    # loop through GFF files, populate databases and write RDF graphs
     for gff_file in args['GFF_FILE']:
         if args['-d']:
             # populate a single db from all GFF files
