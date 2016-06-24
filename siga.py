@@ -7,9 +7,9 @@ References:
 [2] Resource Description Framework, https://www.w3.org/TR/rdf11-concepts/
 
 Usage:
-  siga.py -h | --help
-  siga.py -v | --version
-  siga.py [-cV ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
+  SIGA.py -h | --help
+  SIGA.py -v | --version
+  SIGA.py [-cV ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF versions 2 or 3.
