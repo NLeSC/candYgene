@@ -35,7 +35,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -46,23 +46,21 @@ def normalize_filext(s):
         s = dot + s
     return s
 
-#def normalize_feature_id(id):
-#    return replace(id + ':', '')
+def normalize_feature_id(id):
+    return id.split(':')[1] # gene:Solyc00g005000.2 -> Solyc00g005000.2
 
 def triplify(db, format):
     format2fext = dict(turtle = '.ttl', xml = '.rdf', n3 = '.n3')
     assert(format in format2fext), "Unsupported RDF serialization '%s'." % format
 
     # define additional namespaces
-    SO = Namespace('http://purl.obolibrary.org/obo/') # Sequence Ontology (Feature Annotation)
+    SO = Namespace('http://purl.obolibrary.org/obo/so.owl#') # Sequence Ontology Feature Annotation
     FALDO = Namespace('http://biohackathon.org/resource/faldo#')
-    BASE = Namespace('https://solgenomics.net/search/quick?term=') # so far no better solution to resolve features
 
     # bind prefixes to namespaces
     g = Graph()
     g.bind('so', SO)
     g.bind('faldo', FALDO)
-    g.bind(None, BASE)
 
     # map feature types and strandedness to ontology terms
     feature2onto = {'gene' : SO.SO_0000704,
@@ -77,34 +75,39 @@ def triplify(db, format):
                     '?' : FALDO.StrandedPosition,
                     '.' : FALDO.Position}
 
+    # Note: so far there is no optimal/universal solution to resolve features in SGN:
+    # e.g., a gene feature identified by 'gene:Solyc00g005000.2' resolves to
+    # https://solgenomics.net/locus/Solyc00g005000.2/view
+    # However, its related features such as mRNA, exon or intron do not resolve the same way
+    # e.g., mRNA:Solyc00g005000.2.1 resolves to https://solgenomics.net/feature/17660840/details
+    base_uri ='https://solgenomics.net/locus/'
+
     for feature in db.all_features():
+        if feature.strand not in feature2onto:
+            raise KeyError("Incorrect strand information for feature ID '%s'." % feature.id)
         try:
-            s = URIRef(BASE + feature.id)
-            p = URIRef(RDF.type)
-            o = URIRef(feature2onto[feature.featuretype])
+            feature_type = URIRef(feature2onto[feature.featuretype])
+            strand = feature2onto[feature.strand]
+            subject = URIRef(base_uri + normalize_feature_id(feature.id) + '/view')
             start = BNode()
             end = BNode()
 
-            if feature.strand not in feature2onto:
-                raise ValueError("Incorrect strand information for feature ID '%s'." % feature.id)
-            strand = feature2onto[feature.strand]
-
-            g.add( (s, p, o) )
-            g.add( (s, RDFS.label, Literal(feature.featuretype, datatype=XSD.string)) )
-            g.add( (s, RDF.type, FALDO.Region) )
+            # add triples to graph
+            g.add( (subject, RDF.type, feature_type) )
+            g.add( (subject, RDFS.label, Literal(feature.featuretype, datatype=XSD.string)) )
+            g.add( (subject, RDF.type, FALDO.Region) )
 
             # add feature start/end positions and strand info
-            g.add( (s, FALDO.begin, start) )
+            g.add( (subject, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
             g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.nonNegativeInteger)) )
             g.add( (start, FALDO.reference, Literal(feature.seqid, datatype=XSD.string)) )
-            g.add( (s, FALDO.begin, end) )
+            g.add( (subject, FALDO.end, end) )
             g.add( (end, RDF.type, FALDO.ExactPosition) )
             g.add( (end, RDF.type, strand) )
             g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.nonNegativeInteger)) )
             g.add( (end, FALDO.reference, Literal(feature.seqid, datatype=XSD.string)) )
-
         except KeyError:
             pass
 
