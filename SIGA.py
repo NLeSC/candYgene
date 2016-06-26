@@ -9,7 +9,7 @@ References:
 Usage:
   SIGA.py -h | --help
   SIGA.py -v | --version
-  SIGA.py [-cV ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] GFF_FILE...
+  SIGA.py [-cV ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] -b BASE_URI GFF_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF versions 2 or 3.
@@ -18,9 +18,10 @@ Options:
   -h, --help
   -v, --version
   -V, --verbose    Use for debugging.
+  -b BASE_URI      Set base URI (e.g., https://solgenomics.net/).
   -d DB_FILE       Populate a single SQLite database from one or more GFF files.
-  -e DB_FILE_EXT   Database file extension. [default: .db].
-  -o FORMAT        Select RDF serialization format: turtle (.ttl), n3 (.n3) or xml (.rdf). [default: turtle]
+  -e DB_FILE_EXT   Database file extension [default: .db].
+  -o FORMAT        Select RDF serialization format: turtle (.ttl), n3 (.n3) or xml (.rdf) [default: turtle].
   -c               Check the referential integrity of database(s).
 
 """
@@ -29,13 +30,15 @@ from __future__ import print_function
 from docopt import docopt
 from rdflib import Graph, URIRef, Literal, BNode
 from rdflib.namespace import Namespace, RDF, RDFS, XSD
+from urllib2 import urlparse
 
 import os
+import re
 import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -46,12 +49,37 @@ def normalize_filext(s):
         s = dot + s
     return s
 
-def normalize_feature_id(id):
-    return id.split(':')[1] # gene:Solyc00g005000.2 -> Solyc00g005000.2
+def validate_uri(uri):
+    u = urlparse.urlparse(uri)
+    if u.scheme not in ('http', 'https', 'ftp'):
+        raise ValueError("Invalid URI scheme used in '%s'." % uri)
+    if u.netloc is '':
+        raise ValueError('No host specified.')
+    return u.geturl()
 
-def triplify(db, format):
-    format2fext = dict(turtle = '.ttl', xml = '.rdf', n3 = '.n3')
-    assert(format in format2fext), "Unsupported RDF serialization '%s'." % format
+def get_resolvable_uri(uri):
+    # Note: There is no optimal/universal solution to resolve all features in SGN:
+    # e.g., a gene feature identified by 'gene:Solyc00g005000.2' resolves to
+    # https://solgenomics.net/locus/Solyc00g005000.2/view
+    # However, related features such as mRNA, exon, intron do not resolve that way:
+    # mRNA:Solyc00g005000.2.1 -> https://solgenomics.net/feature/17660840/details
+    # exon:Solyc00g005000.2.1.1 -> https://solgenomics.net/feature/17660841/details
+    # exon:Solyc00g005000.2.1.2 -> https://solgenomics.net/feature/17660843/details
+    # intron:Solyc00g005000.2.1.1 -> https://solgenomics.net/feature/17660842/details
+    #
+    # Moreover, feature IDs are prefixed with feature type (e.g., 'gene:Solyc00g005000.2')
+    # and need to be "normalized" (resulting in 'Solyc00g005000.2') to generate resolvable URIs
+    # (https://solgenomics.net/locus/Solyc00g005000.2/view).
+    # However, UTRs does not seem to have corresponding URLs (https://solgenomics.net/feature/...).
+    # Moreover, the aforementioned "normalization" does no result in unique features IDs i.e.,
+    # both 'five_prime_UTR:Solyc00g005000.2.1.0' and 'three_prime_UTR:Solyc00g005000.2.1.0'
+    # become 'Solyc00g005000.2.1.0'
+    return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', validate_uri(uri))
+
+def triplify(db, format, base_uri):
+    format2filext = dict(turtle = '.ttl', xml = '.rdf', n3 = '.n3')
+    if format not in format2filext:
+        raise IOError("Unsupported RDF serialization '%s'." % format)
 
     # define additional namespaces
     SO = Namespace('http://purl.obolibrary.org/obo/so.owl#') # Sequence Ontology Feature Annotation
@@ -75,20 +103,13 @@ def triplify(db, format):
                     '?' : FALDO.StrandedPosition,
                     '.' : FALDO.Position}
 
-    # Note: so far there is no optimal/universal solution to resolve features in SGN:
-    # e.g., a gene feature identified by 'gene:Solyc00g005000.2' resolves to
-    # https://solgenomics.net/locus/Solyc00g005000.2/view
-    # However, its related features such as mRNA, exon or intron do not resolve the same way
-    # e.g., mRNA:Solyc00g005000.2.1 resolves to https://solgenomics.net/feature/17660840/details
-    base_uri ='https://solgenomics.net/locus/'
-
     for feature in db.all_features():
         if feature.strand not in feature2onto:
             raise KeyError("Incorrect strand information for feature ID '%s'." % feature.id)
         try:
             feature_type = URIRef(feature2onto[feature.featuretype])
             strand = feature2onto[feature.strand]
-            subject = URIRef(base_uri + normalize_feature_id(feature.id) + '/view')
+            subject = URIRef(get_resolvable_uri(os.path.join(base_uri, feature.featuretype, feature.id)))
             start = BNode()
             end = BNode()
 
@@ -111,14 +132,14 @@ def triplify(db, format):
         except KeyError:
             pass
 
-    outfile = os.path.splitext(db.dbfn)[0] + format2fext[format]
+    outfile = os.path.splitext(db.dbfn)[0] + format2filext[format]
     with open(outfile, 'w') as fout:
         fout.write(g.serialize(format=format))
  
 if __name__ == '__main__':
     args = docopt(__doc__, version=__version__)
     #print(args)
-
+    base_uri = validate_uri(args['-b'])
     format = args['-o']
     debug = args['--verbose']
     fk_constraints = 'ON' if args['-c'] is True else 'OFF'
@@ -146,9 +167,9 @@ if __name__ == '__main__':
                 raise IOError("GFF file '%s' not found." % gff_file)
             except sql.IntegrityError, e:
                 raise IOError("%s in database '%s'." % (e, db_file))
-            triplify(db, format)
+            triplify(db, format, base_uri)
 
     if args['-d']:
         db_file = args['-d']
         db = gff.FeatureDB(db_file)
-        triplify(db, format)
+        triplify(db, format, base_uri)
