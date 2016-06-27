@@ -12,7 +12,7 @@ Usage:
   SIGA.py [-cV ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] -b BASE_URI GFF_FILE...
 
 Arguments:
-  GFF_FILE...      Input file(s) in GFF versions 2 or 3.
+  GFF_FILE...      Input file(s) in GFF version 2 or 3.
 
 Options:
   -h, --help
@@ -90,45 +90,52 @@ def triplify(db, format, base_uri):
     g.bind('so', SO)
     g.bind('faldo', FALDO)
 
-    # map feature types and strandedness to ontology terms
-    feature2onto = {'gene' : SO.SO_0000704,
-                    'mRNA' : SO.SO_0000234,
-                    'CDS'  : SO.SO_0000316,
-                    'exon' : SO.SO_0000147,
-                    'intron' : SO.SO_0000188,
-                    'five_prime_UTR' : SO.SO_0000204,
-                    'three_prime_UTR' : SO.SO_0000205,
-                    '+' : FALDO.ForwardStrandPosition,
-                    '-' : FALDO.ReverseStrandPosition,
-                    '?' : FALDO.StrandedPosition,
-                    '.' : FALDO.Position}
+    # map feature types and strandedness to ontology terms (classes)
+    feature_onto_class = {
+        'gene' : SO.SO_0000704,
+        'mRNA' : SO.SO_0000234,
+        'CDS'  : SO.SO_0000316,
+        'exon' : SO.SO_0000147,
+        'intron' : SO.SO_0000188,
+        'five_prime_UTR' : SO.SO_0000204,
+        'three_prime_UTR' : SO.SO_0000205,
+        '+' : FALDO.ForwardStrandPosition,
+        '-' : FALDO.ReverseStrandPosition,
+        '?' : FALDO.StrandedPosition,
+        '.' : FALDO.Position
+    }
 
     for feature in db.all_features():
-        if feature.strand not in feature2onto:
+        if feature.strand not in feature_onto_class:
             raise KeyError("Incorrect strand information for feature ID '%s'." % feature.id)
         try:
-            feature_type = URIRef(feature2onto[feature.featuretype])
-            strand = feature2onto[feature.strand]
-            subject = URIRef(get_resolvable_uri(os.path.join(base_uri, feature.featuretype, feature.id)))
+            feature_type = URIRef(feature_onto_class[feature.featuretype])
+            strand = feature_onto_class[feature.strand]
+            feature_parent = URIRef(get_resolvable_uri(os.path.join(base_uri, feature.featuretype, feature.id)))
             start = BNode()
             end = BNode()
 
             # add triples to graph
-            g.add( (subject, RDF.type, feature_type) )
-            g.add( (subject, RDFS.label, Literal(feature.featuretype, datatype=XSD.string)) )
-            g.add( (subject, RDF.type, FALDO.Region) )
+            g.add( (feature_parent, RDF.type, feature_type) )
+            g.add( (feature_parent, RDFS.label, Literal(feature.featuretype, datatype=XSD.string)) )
+            g.add( (feature_parent, RDF.type, FALDO.Region) )
 
             # add feature start/end positions and strand info
-            g.add( (subject, FALDO.begin, start) )
+            g.add( (feature_parent, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
             g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.nonNegativeInteger)) )
             g.add( (start, FALDO.reference, Literal(feature.seqid, datatype=XSD.string)) )
-            g.add( (subject, FALDO.end, end) )
+            g.add( (feature_parent, FALDO.end, end) )
             g.add( (end, RDF.type, FALDO.ExactPosition) )
             g.add( (end, RDF.type, strand) )
             g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.nonNegativeInteger)) )
             g.add( (end, FALDO.reference, Literal(feature.seqid, datatype=XSD.string)) )
+
+            # add parent-child relationships between features
+            for child in db.children(feature, level=1):
+                feature_child = URIRef(get_resolvable_uri(os.path.join(base_uri, child.featuretype, child.id)))
+                g.add( (feature_child, SO.part_of, feature_parent) )
         except KeyError:
             pass
 
