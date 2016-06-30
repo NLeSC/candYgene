@@ -23,6 +23,12 @@ Tomato genome annotations (ITAG2.4 release) from the Sol Genomics Network ([SGN]
 
 **Example usage**
 
-Generate RDF triples in Turtle format (default) using https://solgenomics.net/ as base URI
+Check data integrity (verbose output) and generate RDF triples in Turtle format (default) at base URI
 
 `python SIGA.py -cV ITAG2.4_gene_models.gff3 -b https://solgenomics.net/`
+
+Output files in current working directory:
+
+`ITAG2.4_gene_models.db` # relational database in SQLite
+
+`ITAG2.4_gene_models.ttl` # RDF triples in Turtle
