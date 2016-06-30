@@ -21,7 +21,7 @@ Options:
   -b BASE_URI      Set base URI (e.g., https://solgenomics.net/).
   -d DB_FILE       Populate a single SQLite database from one or more GFF files.
   -e DB_FILE_EXT   Database file extension [default: .db].
-  -o FORMAT        Select RDF serialization format: turtle (.ttl), n3 (.n3) or xml (.rdf) [default: turtle].
+  -o FORMAT        Select RDF serialization format: xml (.rdf), ntriples (.nt), n3 (.n3) or turtle (.ttl) [default: turtle].
   -c               Check the referential integrity of database(s).
 
 """
@@ -38,7 +38,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -77,7 +77,11 @@ def get_resolvable_uri(uri):
     return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', validate_uri(uri))
 
 def triplify(db, format, base_uri):
-    format2filext = dict(turtle = '.ttl', xml = '.rdf', n3 = '.n3')
+    format2filext = dict(xml = '.rdf',
+                         ntriples = '.nt',
+                         turtle = '.ttl',
+                         n3 = '.n3')
+
     if format not in format2filext:
         raise IOError("Unsupported RDF serialization '%s'." % format)
 
