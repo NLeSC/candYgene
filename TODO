@@ -1,0 +1,8 @@
+This is a random list of potential improvements:
+- support more features: proteins, protein domains/motifs, chromosomes etc.
+- support named RDF graphs (JSON-LD, TriG, N-Quads)
+- provide external links to primary sequence databases (e.g. ENA, UniProt, InterPro, GO)
+- add provenance information (e.g. versioning of genome builds and annotations) using PROV-O, PAV and/or NanoPub
+- resolvable SGN URIs for all genome features
+- make the SGN resource available as Linked Open Data
+
