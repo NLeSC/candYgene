@@ -17,17 +17,23 @@
 
 **Installation**
 
+`virtualenv sigaenv`
+
 `pip install -r requirements.txt`
 
 **Example data**
 
-Tomato genome annotations (ITAG2.4 release) from the Sol Genomics Network ([SGN](https://solgenomics.net))
+`cd examples`
+
+Download tomato genome annotations (ITAG2.4 release) from the Sol Genomics Network ([SGN](https://solgenomics.net))
 
 `wget ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3`
 
 **Example usage**
 
 Check data integrity (verbose output) and generate RDF triples in Turtle format (default) at base URI
+
+`cd src`
 
 `python SIGA.py -cV ITAG2.4_gene_models.gff3 -b https://solgenomics.net/`
 
