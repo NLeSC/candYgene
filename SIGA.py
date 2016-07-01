@@ -38,7 +38,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.1.5'
+__version__ = '0.1.6'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -58,23 +58,31 @@ def validate_uri(uri):
     return u.geturl()
 
 def get_resolvable_uri(uri):
-    # Note: There is no optimal/universal solution to resolve all features in SGN:
-    # e.g., a gene feature identified by 'gene:Solyc00g005000.2' resolves to
-    # https://solgenomics.net/locus/Solyc00g005000.2/view
-    # However, related features such as mRNA, exon, intron do not resolve that way:
-    # mRNA:Solyc00g005000.2.1 -> https://solgenomics.net/feature/17660840/details
-    # exon:Solyc00g005000.2.1.1 -> https://solgenomics.net/feature/17660841/details
-    # exon:Solyc00g005000.2.1.2 -> https://solgenomics.net/feature/17660843/details
-    # intron:Solyc00g005000.2.1.1 -> https://solgenomics.net/feature/17660842/details
+    # Note: There is no optimal/universal solution to resolve all features in SGN (https://solgenomics.net/):
+    # e.g., a feature ID in a GFF file 'gene:Solyc00g005000.2' corresponds to three URLs:
+    #   https://solgenomics.net/locus/Solyc00g005000.2/view !!! note the use of 'locus' instead of 'gene' !!!
+    #   https://solgenomics.net/locus/Solyc00g005000/view
+    #   https://solgenomics.net/feature/17660839/details !!! note the use of internal IDs !!!
     #
-    # Moreover, feature IDs are prefixed with feature type (e.g., 'gene:Solyc00g005000.2')
-    # and need to be "normalized" (resulting in 'Solyc00g005000.2') to generate resolvable URIs
-    # (https://solgenomics.net/locus/Solyc00g005000.2/view).
-    # However, UTRs does not seem to have corresponding URLs (https://solgenomics.net/feature/...).
-    # Moreover, the aforementioned "normalization" does no result in unique features IDs i.e.,
-    # both 'five_prime_UTR:Solyc00g005000.2.1.0' and 'three_prime_UTR:Solyc00g005000.2.1.0'
-    # become 'Solyc00g005000.2.1.0'
-    return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', validate_uri(uri))
+    # The search term 'Solyc00g005000' returns a page with links to:
+    # tomato locus   https://solgenomics.net/locus/8377/view !!! where the term is referred to as locus (name|symbol)
+    # gene feature   https://solgenomics.net/feature/17660839/details
+    #
+    # However, related features such as mRNA, exon, intron do not resolve same way:
+    #   mRNA:Solyc00g005000.2.1       https://solgenomics.net/feature/17660840/details
+    #   exon:Solyc00g005000.2.1.1     https://solgenomics.net/feature/17660841/details
+    #   exon:Solyc00g005000.2.1.2     https://solgenomics.net/feature/17660843/details
+    #   intron:Solyc00g005000.2.1.1   https://solgenomics.net/feature/17660842/details
+    #   five_prime_UTR and three_prime_UTR do not seem to have corresponding URLs.
+    #
+    # In principle, feature IDs in the 'attributes' column of a GFF file should be opaque.
+    # Currently, the IDs are prefixed with feature type, e.g. 'gene:Solyc00g005000.2'.
+    #
+    # "Normalizing" feature ID by removing the prefixes seems a reasonable option for most feature types, except
+    # for the UTRs, which would have ambiguous feature IDs, e.g., Solyc00g005000.2.1.0 for both
+    # 'five_prime_UTR:Solyc00g005000.2.1.0' and 'three_prime_UTR:Solyc00g005000.2.1.0'
+    #
+    return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', validate_uri(uri)) # this is ugly
 
 def triplify(db, format, base_uri):
     format2filext = dict(xml = '.rdf',
@@ -85,16 +93,14 @@ def triplify(db, format, base_uri):
     if format not in format2filext:
         raise IOError("Unsupported RDF serialization '%s'." % format)
 
-    # define additional namespaces
-    SO = Namespace('http://purl.obolibrary.org/obo/so.owl#') # Sequence Ontology Feature Annotation
-    FALDO = Namespace('http://biohackathon.org/resource/faldo#')
-
-    # bind prefixes to namespaces
+    # define additional namespace prefixes
+    SO = Namespace('http://purl.obolibrary.org/obo/so.owl#')     # Sequence Ontology Feature Annotation
+    FALDO = Namespace('http://biohackathon.org/resource/faldo#') # Feature Annotation Location Description Ontology
     g = Graph()
     g.bind('so', SO)
     g.bind('faldo', FALDO)
 
-    # map feature types and strandedness to ontology terms (classes)
+    # map feature types and DNA strandedness to ontologies classes
     feature_onto_class = {
         'gene' : SO.SO_0000704,
         'mRNA' : SO.SO_0000234,
@@ -121,10 +127,10 @@ def triplify(db, format, base_uri):
 
             # add triples to graph
             g.add( (feature_parent, RDF.type, feature_type) )
-            g.add( (feature_parent, RDFS.label, Literal(feature.featuretype, datatype=XSD.string)) )
+            g.add( (feature_parent, RDFS.label, Literal(' '.join([feature.featuretype, feature.id]), datatype=XSD.string)) )
             g.add( (feature_parent, RDF.type, FALDO.Region) )
 
-            # add feature start/end positions and strand info
+            # add feature start/end coordinates and strand info
             g.add( (feature_parent, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
