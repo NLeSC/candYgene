@@ -7,4 +7,5 @@ This is a random list of potential improvements:
 - make the SGN resource available as Linked Open Data
 - add configuration file (e.g. config.py)
 - add logging
+- add option to generate RDF from an existing sqlite db
 
