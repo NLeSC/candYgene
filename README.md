@@ -19,13 +19,15 @@
 
 `virtualenv sigaenv`
 
+`source sigaenv/bin/activate`
+
 `pip install -r requirements.txt`
 
 **Example data**
 
-`cd examples`
+Small GFF files are in `cd examples`
 
-Download tomato genome annotations (ITAG2.4 release) from the Sol Genomics Network ([SGN](https://solgenomics.net))
+or download tomato genome annotations (ITAG2.4 release) in GFF from the [Sol Genomics Network](https://solgenomics.net) (SGN).
 
 `wget ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3`
 
