@@ -30,7 +30,7 @@ from __future__ import print_function
 from docopt import docopt
 from rdflib import Graph, URIRef, Literal, BNode
 from rdflib.namespace import Namespace, RDF, RDFS, XSD
-from urllib2 import urlparse
+from urllib2 import urlparse, unquote
 
 import os
 import re
@@ -127,8 +127,16 @@ def triplify(db, format, base_uri):
 
             # add triples to graph
             g.add( (feature_parent, RDF.type, feature_type) )
-            g.add( (feature_parent, RDFS.label, Literal(' '.join([feature.featuretype, feature.id]), datatype=XSD.string)) )
             g.add( (feature_parent, RDF.type, FALDO.Region) )
+
+            gff.constants.always_return_list = False # return attributes (9th column in GFF) as str
+            label = feature.attributes.get('Name')
+            comment = feature.attributes.get('Note')
+            if label is not None: # map Name attr to rdfs:label
+                label = "{0} {1}".format(feature.featuretype, label) # concat feature type and name
+                g.add( (feature_parent, RDFS.label, Literal(label, datatype=XSD.string)) )
+            if comment is not None: # map Note attr to rdfs:comment
+                g.add( (feature_parent, RDFS.comment, Literal(unquote(comment), datatype=XSD.string)) )
 
             # add feature start/end coordinates and strand info
             g.add( (feature_parent, FALDO.begin, start) )
