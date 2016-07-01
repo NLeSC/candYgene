@@ -5,4 +5,6 @@ This is a random list of potential improvements:
 - add provenance information (e.g. versioning of genome builds and annotations) using PROV-O, PAV, VoID, DCAT and/or NanoPub
 - resolvable SGN URIs for all genome features
 - make the SGN resource available as Linked Open Data
+- add configuration file (e.g. config.py)
+- add logging
 
