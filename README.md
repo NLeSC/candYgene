@@ -11,7 +11,7 @@
   - [N-Triples](https://www.w3.org/TR/n-triples/)
   - [Turtle](https://www.w3.org/TeamSubmission/turtle/)
   - [Notation3](https://www.w3.org/DesignIssues/Notation3.html) (N3)
-- currently supported (hierarchy of) features: *gene -> mRNA -> [CDS, exon, intro, five_prime_UTR, three_prime_UTR]*
+- currently supported (hierarchy of) features: *chromosome -> gene -> mRNA -> [CDS, exon, intro, five_prime_UTR, three_prime_UTR]*
 - typed features and their parent-child relations using [SO(FA)](http://www.sequenceontology.org/) and [FALDO](https://github.com/JervenBolleman/FALDO) ontologies
 - ensure referential integrity of data (i.e., parent-child feature relations)
 
