@@ -52,6 +52,9 @@ Edit _virtuoso.ini_ config file by adding _/mypath-to-RDF/_ to _DirsAllowed_.
 Connect to DB:
 `isql 1111 dba`
 
+Delete any previously registered data sets:
+`DELETE FROM DB.DBA.load_list;`
+
 Register data set:
 `ld_dir('/mypath-to-RDF/', 'ITAG2.4_gene_models.ttl', 'https://solgenomics.net#');`
 
