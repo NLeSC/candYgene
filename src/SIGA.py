@@ -148,16 +148,19 @@ def triplify(db, format, base_uri):
             #g.add( (feature_parent, RDF.type, EDAM.data_3034) ) # sequence feature identifier
             #g.add( (feature_parent, EDAM.is_output_of, EDAM.operation_2454) ) # Gene prediction
 
-            # add chromosome, feature start/end coordinates and strand info to graph
+            # add chromosome info to graph
+            # N.B.: here we assume seqid refers to a chromosome
             chrom = URIRef(os.path.join(base_uri, 'chromosome', feature.seqid))
             g.add( (chrom, RDF.type, feature_onto_class['chromosome']) )
             g.add( (chrom, RDFS.label, Literal('chromosome %s' % feature.seqid, datatype=XSD.string)) )
+
+            # add feature start/end coordinates and strand info to graph
             g.add( (feature_parent, RDF.type, FALDO.Region) )
             g.add( (feature_parent, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
             g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.nonNegativeInteger)) )
-            g.add( (start, FALDO.reference, Literal(feature.seqid, datatype=XSD.string)) )
+            g.add( (start, FALDO.reference, chrom) )
             g.add( (feature_parent, FALDO.end, end) )
             g.add( (end, RDF.type, FALDO.ExactPosition) )
             g.add( (end, RDF.type, strand) )
