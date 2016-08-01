@@ -44,3 +44,22 @@ Output files in current working directory:
 `ITAG2.4_gene_models.db` # relational database in SQLite
 
 `ITAG2.4_gene_models.ttl` # RDF triples in Turtle
+
+**Import data into Virtuoso RDF Store**
+
+Edit _virtuoso.ini_ config file by adding _/mypath-to-RDF/_ to _DirsAllowed_.
+
+Connect to DB:
+`isql 1111 dba`
+
+Register data set:
+`ld_dir('/mypath-to-RDF/', 'ITAG2.4_gene_models.ttl', 'https://solgenomics.net#');`
+
+Check if data set is registered:
+`SELECT * FROM DB.DBA.load_list;`
+
+Load RDF file:
+`rdf_loader_run();`
+
+Count imported triples:
+`SPARQL SELECT COUNT(*) FROM <https://solgenomics.net#> { ?s ?p ?o };`
