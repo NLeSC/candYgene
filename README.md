@@ -63,3 +63,6 @@ Load RDF file:
 
 Count imported triples:
 `SPARQL SELECT COUNT(*) FROM <https://solgenomics.net#> { ?s ?p ?o };`
+
+Count triples in the input file:
+`rapper -i turtle -c ITAG2.4_gene_models.ttl`
