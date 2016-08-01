@@ -38,7 +38,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.1.6'
+__version__ = '0.1.7'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -49,6 +49,7 @@ def normalize_filext(s):
         s = dot + s
     return s
 
+
 def validate_uri(uri):
     u = urlparse.urlparse(uri)
     if u.scheme not in ('http', 'https', 'ftp'):
@@ -56,6 +57,7 @@ def validate_uri(uri):
     if u.netloc is '':
         raise ValueError('No host specified.')
     return u.geturl()
+
 
 def get_resolvable_uri(uri):
     # Note: There is no optimal/universal solution to resolve all features in SGN (https://solgenomics.net/):
@@ -84,6 +86,7 @@ def get_resolvable_uri(uri):
     #
     return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', validate_uri(uri)) # this is ugly
 
+
 def triplify(db, format, base_uri):
     format2filext = dict(xml = '.rdf',
                          ntriples = '.nt',
@@ -96,11 +99,14 @@ def triplify(db, format, base_uri):
     # define additional namespace prefixes
     SO = Namespace('http://purl.obolibrary.org/obo/so.owl#')     # Sequence Ontology Feature Annotation
     FALDO = Namespace('http://biohackathon.org/resource/faldo#') # Feature Annotation Location Description Ontology
+    #EDAM = Namespace('http://edamontology.org/')                 # EMBRACE Data And Methods ontology
+
     g = Graph()
     g.bind('so', SO)
     g.bind('faldo', FALDO)
+    #g.bind('edam', EDAM)
 
-    # map feature types and DNA strandedness to ontologies classes
+    # map feature types and DNA strandedness to ontology classes
     feature_onto_class = {
         'gene' : SO.SO_0000704,
         'mRNA' : SO.SO_0000234,
@@ -109,6 +115,7 @@ def triplify(db, format, base_uri):
         'intron' : SO.SO_0000188,
         'five_prime_UTR' : SO.SO_0000204,
         'three_prime_UTR' : SO.SO_0000205,
+        'chromosome' : SO.SO_0000340,
         '+' : FALDO.ForwardStrandPosition,
         '-' : FALDO.ReverseStrandPosition,
         '?' : FALDO.StrandedPosition,
@@ -119,26 +126,33 @@ def triplify(db, format, base_uri):
         if feature.strand not in feature_onto_class:
             raise KeyError("Incorrect strand information for feature ID '%s'." % feature.id)
         try:
-            feature_type = URIRef(feature_onto_class[feature.featuretype])
             strand = feature_onto_class[feature.strand]
+            feature_type = URIRef(feature_onto_class[feature.featuretype])
             feature_parent = URIRef(get_resolvable_uri(os.path.join(base_uri, feature.featuretype, feature.id)))
             start = BNode()
             end = BNode()
 
-            # add triples to graph
+            # add feature types to graph
             g.add( (feature_parent, RDF.type, feature_type) )
-            g.add( (feature_parent, RDF.type, FALDO.Region) )
-
-            gff.constants.always_return_list = False # return attributes (9th column in GFF) as str
+            gff.constants.always_return_list = False # return GFF attributes (9th column) as string
             label = feature.attributes.get('Name')
             comment = feature.attributes.get('Note')
             if label is not None: # map Name attr to rdfs:label
                 label = "{0} {1}".format(feature.featuretype, label) # concat feature type and name
                 g.add( (feature_parent, RDFS.label, Literal(label, datatype=XSD.string)) )
+
             if comment is not None: # map Note attr to rdfs:comment
                 g.add( (feature_parent, RDFS.comment, Literal(unquote(comment), datatype=XSD.string)) )
 
-            # add feature start/end coordinates and strand info
+            # add feature source to graph
+            #g.add( (feature_parent, RDF.type, EDAM.data_3034) ) # sequence feature identifier
+            #g.add( (feature_parent, EDAM.is_output_of, EDAM.operation_2454) ) # Gene prediction
+
+            # add chromosome, feature start/end coordinates and strand info to graph
+            chrom = URIRef(os.path.join(base_uri, 'chromosome', feature.seqid))
+            g.add( (chrom, RDF.type, feature_onto_class['chromosome']) )
+            g.add( (chrom, RDFS.label, Literal('chromosome %s' % feature.seqid, datatype=XSD.string)) )
+            g.add( (feature_parent, RDF.type, FALDO.Region) )
             g.add( (feature_parent, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
@@ -148,9 +162,9 @@ def triplify(db, format, base_uri):
             g.add( (end, RDF.type, FALDO.ExactPosition) )
             g.add( (end, RDF.type, strand) )
             g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.nonNegativeInteger)) )
-            g.add( (end, FALDO.reference, Literal(feature.seqid, datatype=XSD.string)) )
+            g.add( (end, FALDO.reference, chrom) )
 
-            # add parent-child relationships between features
+            # add parent-child relationships between features to graph
             for child in db.children(feature, level=1):
                 feature_child = URIRef(get_resolvable_uri(os.path.join(base_uri, child.featuretype, child.id)))
                 g.add( (feature_child, SO.part_of, feature_parent) )
