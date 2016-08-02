@@ -1,6 +1,5 @@
 [candYgene](http://software.esciencecenter.nl/project/candygene/)
-=========
-
+=
 *SIGA.py* is a command-line tool to generate *Semantically Interoperable Genome Annotations* from
 [GFF](https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md) files according to the Resource Description Framework ([RDF](https://www.w3.org/TR/rdf11-concepts/)) specification.
 
@@ -25,21 +24,21 @@
 
 **Example data**
 
-Small GFF files are in `cd examples`
+`cd examples`
 
-or download tomato genome annotations (ITAG2.4 release) in GFF from the [Sol Genomics Network](https://solgenomics.net) (SGN).
+or download the latest tomato genome annotations (ITAG2.4 release) in GFF files from the [Sol Genomics Network](https://solgenomics.net) (SGN).
 
 `wget ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3`
 
 **Example usage**
 
-Check data integrity (verbose output) and generate RDF triples in Turtle format (default) at base URI
-
 `cd src`
+
+Generate RDF triples in Turtle format (default) at the base URI.
 
 `python SIGA.py -cV ITAG2.4_gene_models.gff3 -b https://solgenomics.net/`
 
-Output files in current working directory:
+See the output files in the current directory:
 
 `ITAG2.4_gene_models.db` # relational database in SQLite
 
@@ -51,7 +50,7 @@ See the [documentation](http://virtuoso.openlinksw.com/dataspace/doc/dav/wiki/Ma
 
 Edit _virtuoso.ini_ config file by adding _/mydatadir/_ to _DirsAllowed_.
 
-Connect to db:
+Connect to db server:
 `isql 1111 dba`
 
 Delete any previously registered data files:
