@@ -45,11 +45,13 @@ Output files in current working directory:
 
 `ITAG2.4_gene_models.ttl` # RDF triples in Turtle
 
-**Import data into Virtuoso RDF Store**
+**Import RDF files into Virtuoso**
+
+See the [documentation](http://virtuoso.openlinksw.com/dataspace/doc/dav/wiki/Main/VirtBulkRDFLoader) for more details.
 
 Edit _virtuoso.ini_ config file by adding _/mydatadir/_ to _DirsAllowed_.
 
-Connect to DB:
+Connect to db:
 `isql 1111 dba`
 
 Delete any previously registered data sets:
