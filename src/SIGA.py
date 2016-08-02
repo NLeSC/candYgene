@@ -3,7 +3,7 @@ SIGA.py is a command-line tool to generate Semantically Interoperable Genome Ann
 GFF files [1] according to the RDF specification [2].
 
 References:
-[1] Generic Feature Format specification, http://www.sequenceontology.org/gff3.shtml
+[1] Generic Feature Format specification, http://www.sequenceontology.org/
 [2] Resource Description Framework, https://www.w3.org/TR/rdf11-concepts/
 
 Usage:
@@ -18,7 +18,7 @@ Options:
   -h, --help
   -v, --version
   -V, --verbose    Use for debugging.
-  -b BASE_URI      Set base URI (e.g., https://solgenomics.net/).
+  -b BASE_URI      Set the base URI (e.g., https://solgenomics.net/).
   -d DB_FILE       Populate a single SQLite database from one or more GFF files.
   -e DB_FILE_EXT   Database file extension [default: .db].
   -o FORMAT        Select RDF serialization format: xml (.rdf), ntriples (.nt), n3 (.n3) or turtle (.ttl) [default: turtle].
@@ -38,12 +38,14 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.1.7'
+__version__ = '0.1.8'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
 
 def normalize_filext(s):
+    """Prefix file extension with a dot '.' if not done already."""
+
     dot = '.'
     if s.startswith(dot) is False:
         s = dot + s
@@ -51,6 +53,8 @@ def normalize_filext(s):
 
 
 def validate_uri(uri):
+    """Validate input URI (scheme and host)."""
+
     u = urlparse.urlparse(uri)
     if u.scheme not in ('http', 'https', 'ftp'):
         raise ValueError("Invalid URI scheme used in '%s'." % uri)
@@ -59,7 +63,9 @@ def validate_uri(uri):
     return u.geturl()
 
 
-def get_resolvable_uri(uri):
+def normalize_feature_id(id):
+    """Ad-hoc function to normalize feature IDs."""
+
     # Note: There is no optimal/universal solution to resolve all features in SGN (https://solgenomics.net/):
     # e.g., a feature ID in a GFF file 'gene:Solyc00g005000.2' corresponds to three URLs:
     #   https://solgenomics.net/locus/Solyc00g005000.2/view !!! note the use of 'locus' instead of 'gene' !!!
@@ -67,8 +73,8 @@ def get_resolvable_uri(uri):
     #   https://solgenomics.net/feature/17660839/details !!! note the use of internal IDs !!!
     #
     # The search term 'Solyc00g005000' returns a page with links to:
-    # tomato locus   https://solgenomics.net/locus/8377/view !!! where the term is referred to as locus (name|symbol)
-    # gene feature   https://solgenomics.net/feature/17660839/details
+    #   tomato locus  https://solgenomics.net/locus/8377/view !!! where the term is referred to as locus (name|symbol)
+    #   gene feature  https://solgenomics.net/feature/17660839/details
     #
     # However, related features such as mRNA, exon, intron do not resolve same way:
     #   mRNA:Solyc00g005000.2.1       https://solgenomics.net/feature/17660840/details
@@ -80,21 +86,23 @@ def get_resolvable_uri(uri):
     # In principle, feature IDs in the 'attributes' column of a GFF file should be opaque.
     # Currently, the IDs are prefixed with feature type, e.g. 'gene:Solyc00g005000.2'.
     #
-    # "Normalizing" feature ID by removing the prefixes seems a reasonable option for most feature types, except
+    # "Normalizing" feature IDs by removing the prefixes seems reasonable for most feature types, except
     # for the UTRs, which would have ambiguous feature IDs, e.g., Solyc00g005000.2.1.0 for both
     # 'five_prime_UTR:Solyc00g005000.2.1.0' and 'three_prime_UTR:Solyc00g005000.2.1.0'
     #
-    return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', validate_uri(uri)) # this is ugly
+    return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', id)
 
 
-def triplify(db, format, base_uri):
-    format2filext = dict(xml = '.rdf',
-                         ntriples = '.nt',
-                         turtle = '.ttl',
-                         n3 = '.n3')
+def triplify(db, fmt, base_uri):
+    """Generate RDF triples from RDB using Direct Mapping approach."""
 
-    if format not in format2filext:
-        raise IOError("Unsupported RDF serialization '%s'." % format)
+    fmt2fext = dict(xml = '.rdf',
+                    ntriples = '.nt',
+                    turtle = '.ttl',
+                    n3 = '.n3')
+
+    if fmt not in fmt2fext:
+        raise IOError("Unsupported RDF serialization '%s'." % fmt)
 
     # define additional namespace prefixes
     SO = Namespace('http://purl.obolibrary.org/obo/so.owl#')     # Sequence Ontology Feature Annotation
@@ -122,37 +130,37 @@ def triplify(db, format, base_uri):
         '.' : FALDO.Position
     }
 
+    gff.constants.always_return_list = False # GFF attributes (9th column) returned as string
+
     for feature in db.all_features():
         if feature.strand not in feature_onto_class:
             raise KeyError("Incorrect strand information for feature ID '%s'." % feature.id)
-        try:
+        try: # skip GFF feature types not in feature_onto_class dict
             strand = feature_onto_class[feature.strand]
             feature_type = URIRef(feature_onto_class[feature.featuretype])
-            feature_parent = URIRef(get_resolvable_uri(os.path.join(base_uri, feature.featuretype, feature.id)))
+            feature_parent = URIRef(validate_uri(os.path.join(base_uri, feature.featuretype, normalize_feature_id(feature.id))))
             start = BNode()
             end = BNode()
+            comment = feature.attributes.get('Note')
+            name = feature.attributes.get('Name')
+            label = feature.featuretype if name is None else "{0} {1}".format(feature.featuretype, name)
 
             # add feature types to graph
             g.add( (feature_parent, RDF.type, feature_type) )
-            gff.constants.always_return_list = False # return GFF attributes (9th column) as string
-            label = feature.attributes.get('Name')
-            comment = feature.attributes.get('Note')
-            if label is not None: # map Name attr to rdfs:label
-                label = "{0} {1}".format(feature.featuretype, label) # concat feature type and name
-                g.add( (feature_parent, RDFS.label, Literal(label, datatype=XSD.string)) )
+            g.add( (feature_parent, RDFS.label, Literal(label, datatype=XSD.string)) ) # Name attr->rdfs:label
 
-            if comment is not None: # map Note attr to rdfs:comment
-                g.add( (feature_parent, RDFS.comment, Literal(unquote(comment), datatype=XSD.string)) )
+            if comment is not None:
+                g.add( (feature_parent, RDFS.comment, Literal(unquote(comment), datatype=XSD.string)) ) # Note attr->rdfs:comment
 
             # add feature source to graph
             #g.add( (feature_parent, RDF.type, EDAM.data_3034) ) # sequence feature identifier
             #g.add( (feature_parent, EDAM.is_output_of, EDAM.operation_2454) ) # Gene prediction
 
             # add chromosome info to graph
-            # N.B.: here we assume seqid refers to a chromosome
-            chrom = URIRef(os.path.join(base_uri, 'chromosome', feature.seqid))
-            g.add( (chrom, RDF.type, feature_onto_class['chromosome']) )
-            g.add( (chrom, RDFS.label, Literal('chromosome %s' % feature.seqid, datatype=XSD.string)) )
+            # N.B.: it assumed here that seqid refers to chromosome
+            seqid = URIRef(os.path.join(base_uri, 'chromosome', feature.seqid))
+            g.add( (seqid, RDF.type, feature_onto_class['chromosome']) )
+            g.add( (seqid, RDFS.label, Literal('chromosome %s' % feature.seqid, datatype=XSD.string)) )
 
             # add feature start/end coordinates and strand info to graph
             g.add( (feature_parent, RDF.type, FALDO.Region) )
@@ -160,29 +168,30 @@ def triplify(db, format, base_uri):
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
             g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.nonNegativeInteger)) )
-            g.add( (start, FALDO.reference, chrom) )
+            g.add( (start, FALDO.reference, seqid) )
             g.add( (feature_parent, FALDO.end, end) )
             g.add( (end, RDF.type, FALDO.ExactPosition) )
             g.add( (end, RDF.type, strand) )
             g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.nonNegativeInteger)) )
-            g.add( (end, FALDO.reference, chrom) )
+            g.add( (end, FALDO.reference, seqid) ) 
+            # TODO: add mandatory phase info to CDS features
 
             # add parent-child relationships between features to graph
             for child in db.children(feature, level=1):
-                feature_child = URIRef(get_resolvable_uri(os.path.join(base_uri, child.featuretype, child.id)))
+                feature_child = URIRef(validate_uri(os.path.join(base_uri, child.featuretype, normalize_feature_id(child.id))))
                 g.add( (feature_child, SO.part_of, feature_parent) )
         except KeyError:
             pass
 
-    outfile = os.path.splitext(db.dbfn)[0] + format2filext[format]
+    outfile = os.path.splitext(db.dbfn)[0] + fmt2fext[fmt]
     with open(outfile, 'w') as fout:
-        fout.write(g.serialize(format=format))
+        fout.write(g.serialize(format=fmt))
  
 if __name__ == '__main__':
     args = docopt(__doc__, version=__version__)
     #print(args)
     base_uri = validate_uri(args['-b'])
-    format = args['-o']
+    output_format = args['-o']
     debug = args['--verbose']
     fk_constraints = 'ON' if args['-c'] is True else 'OFF'
     pragmas = dict(foreign_keys=fk_constraints)
@@ -209,9 +218,9 @@ if __name__ == '__main__':
                 raise IOError("GFF file '%s' not found." % gff_file)
             except sql.IntegrityError, e:
                 raise IOError("%s in database '%s'." % (e, db_file))
-            triplify(db, format, base_uri)
+            triplify(db, output_format, base_uri)
 
     if args['-d']:
         db_file = args['-d']
         db = gff.FeatureDB(db_file)
-        triplify(db, format, base_uri)
+        triplify(db, output_format, base_uri)
