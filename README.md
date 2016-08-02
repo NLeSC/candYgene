@@ -47,24 +47,29 @@ Output files in current working directory:
 
 **Import RDF files into Virtuoso**
 
-See the [documentation](http://virtuoso.openlinksw.com/dataspace/doc/dav/wiki/Main/VirtBulkRDFLoader) for more details.
+See the [documentation](http://virtuoso.openlinksw.com/dataspace/doc/dav/wiki/Main/VirtBulkRDFLoader) on bulk data loading.
 
 Edit _virtuoso.ini_ config file by adding _/mydatadir/_ to _DirsAllowed_.
 
 Connect to db:
 `isql 1111 dba`
 
-Delete any previously registered data sets:
+Delete any previously registered data files:
 `DELETE FROM DB.DBA.load_list;`
 
-Register data set:
+Register data file(s):
 `ld_dir('/mydatadir/', 'ITAG2.4_gene_models.ttl', 'https://solgenomics.net#');`
 
-Check if data set is registered:
+List registered data file(s):
 `SELECT * FROM DB.DBA.load_list;`
 
-Load RDF file:
+Bulk data loading:
 `rdf_loader_run();`
+
+Note: For loading a single data file one could use the following command:
+`SPARQL LOAD "file:///mydatadir/features.ttl" INTO "https://solgenomics.net#";`
+
+However, Virtuoso generates additional triples which are not present in the input file.
 
 Count imported triples:
 `SPARQL SELECT COUNT(*) FROM <https://solgenomics.net#> { ?s ?p ?o };`
