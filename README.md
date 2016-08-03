@@ -34,15 +34,19 @@ or download the latest tomato genome annotations (ITAG2.4 release) in GFF files 
 
 `cd src`
 
-Generate RDF triples in Turtle format (default) at the base URI.
+Generate RDF triples in Turtle format (default) from a GFF file (two-steps):
 
-`python SIGA.py -cV ITAG2.4_gene_models.gff3 -b https://solgenomics.net/`
+`python SIGA.py db -cV ITAG2.4_gene_models.gff3` # GFF->DB
 
-See the output files in the current directory:
+`python SIGA.py rdf -b https://solgenomics.net ITAG2.4_gene_models.db` # DB->RDF
 
-`ITAG2.4_gene_models.db` # relational database in SQLite
+Summary of I/O files:
 
-`ITAG2.4_gene_models.ttl` # RDF triples in Turtle
+`ITAG2.4_gene_models.gff3` # GFF file
+
+`ITAG2.4_gene_models.db`   # SQLite database
+
+`ITAG2.4_gene_models.ttl`  # RDF file in Turtle
 
 **Import RDF files into Virtuoso**
 
