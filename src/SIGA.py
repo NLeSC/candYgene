@@ -27,7 +27,7 @@ Options:
   -o FORMAT        Select RDF output format:
                      turtle (.ttl) [default: turtle]
                      xml (.rdf),
-                     ntriples (.nt),
+                     nt (.nt),
                      n3 (.n3)
 """
 
@@ -43,7 +43,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -102,7 +102,7 @@ def triplify(db, fmt, base_uri):
     """Generate RDF triples from RDB using Direct Mapping approach."""
 
     fmt2fext = dict(xml = '.rdf',
-                    ntriples = '.nt',
+                    nt = '.nt',
                     turtle = '.ttl',
                     n3 = '.n3')
 
