@@ -7,23 +7,28 @@ References:
 [2] Resource Description Framework, https://www.w3.org/TR/rdf11-concepts/
 
 Usage:
-  SIGA.py -h | --help
-  SIGA.py -v | --version
-  SIGA.py [-cV ] [ -d DB_FILE | -e DB_FILE_EXT ] [ -o FORMAT ] -b BASE_URI GFF_FILE...
+  SIGA.py -h|--help
+  SIGA.py -v|--version
+  SIGA.py db [-cV] [-d DB_FILE|-e DB_FILEXT] GFF_FILE...
+  SIGA.py rdf [-V] [-o FORMAT] -b BASE_URI DB_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF version 2 or 3.
+  DB_FILE...       Input database file(s) in SQLite.
 
 Options:
   -h, --help
   -v, --version
   -V, --verbose    Use for debugging.
-  -b BASE_URI      Set the base URI (e.g., https://solgenomics.net/).
-  -d DB_FILE       Populate a single SQLite database from one or more GFF files.
-  -e DB_FILE_EXT   Database file extension [default: .db].
-  -o FORMAT        Select RDF serialization format: xml (.rdf), ntriples (.nt), n3 (.n3) or turtle (.ttl) [default: turtle].
-  -c               Check the referential integrity of database(s).
-
+  -b BASE_URI      Set the base URI (e.g. https://solgenomics.net/).
+  -d DB_FILE       Populate a database from GFF file(s).
+  -e DB_FILEXT     Set the database file extension [default: .db].
+  -c               Check the referential integrity of the database(s).
+  -o FORMAT        Select RDF output format:
+                     turtle (.ttl) [default: turtle]
+                     xml (.rdf),
+                     ntriples (.nt),
+                     n3 (.n3)
 """
 
 from __future__ import print_function
@@ -38,7 +43,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.1.8'
+__version__ = '0.2.0'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -186,41 +191,52 @@ def triplify(db, fmt, base_uri):
     outfile = os.path.splitext(db.dbfn)[0] + fmt2fext[fmt]
     with open(outfile, 'w') as fout:
         fout.write(g.serialize(format=fmt))
- 
+
+
+def remove_file(fn):
+    """Remove file if exists."""
+    if os.path.exists(fn) is True:
+        os.remove(fn)
+
+
 if __name__ == '__main__':
     args = docopt(__doc__, version=__version__)
     #print(args)
-    base_uri = validate_uri(args['-b'])
-    output_format = args['-o']
     debug = args['--verbose']
-    fk_constraints = 'ON' if args['-c'] is True else 'OFF'
-    pragmas = dict(foreign_keys=fk_constraints)
 
-    # loop through GFF files, populate databases and write RDF graphs
-    for gff_file in args['GFF_FILE']:
-        if args['-d']:
-            # populate a single db from all GFF files
-            db_file = args['-d']
-            if os.path.exists(db_file):
-                db = gff.FeatureDB(db_file)
-                db.update(gff_file)
-            else:
-                db = gff.create_db(gff_file, db_file, verbose=debug, pragmas=pragmas, force=False)
-        else:
-            # populate one db per GFF file
-            base_name = os.path.splitext(gff_file)[0]
-            db_file = base_name + normalize_filext(args['-e'])
-            try:
-                db = gff.create_db(gff_file, db_file, verbose=debug, pragmas=pragmas, force=False)
-            except sql.OperationalError:
-                raise IOError("Database file '%s' already exists." % db_file)
-            except ValueError:
-                raise IOError("GFF file '%s' not found." % gff_file)
-            except sql.IntegrityError, e:
-                raise IOError("%s in database '%s'." % (e, db_file))
+    if args['db'] is True: # in db mode
+        fk_check = 'ON' if args['-c'] is True else 'OFF'
+        pragmas = dict(foreign_keys=fk_check)
+
+        # populate database(s) from GFF file(s)
+        for gff_file in args['GFF_FILE']:
+            if os.path.exists(gff_file) is False:
+               remove_file(db_file)
+               raise IOError("GFF file '%s' not found." % gff_file)
+
+            if args['-d']: # one db for all GFF files
+                db_file = args['-d']
+                if os.path.exists(db_file) is True:
+                    db = gff.FeatureDB(db_file)
+                    db.update(gff_file)
+                else:
+                    db = gff.create_db(gff_file, db_file, verbose=debug, pragmas=pragmas, force=False)
+            else: # one db per GFF file
+                base_name = os.path.splitext(gff_file)[0]
+                db_file = base_name + normalize_filext(args['-e'])
+                try:
+                    db = gff.create_db(gff_file, db_file, verbose=debug, pragmas=pragmas, force=False)
+                except sql.OperationalError:
+                    raise IOError("Database file '%s' already exists." % db_file)
+                except sql.IntegrityError, e:
+                    remove_file(db_file)
+                    raise IOError("%s in database '%s'." % (e, db_file))
+    else: # in rdf mode
+        base_uri = validate_uri(args['-b'])
+        output_format = args['-o']
+
+        # serialize RDF graphs from db files
+        for db_file in args['DB_FILE']:
+            db = gff.FeatureDB(db_file)
             triplify(db, output_format, base_uri)
 
-    if args['-d']:
-        db_file = args['-d']
-        db = gff.FeatureDB(db_file)
-        triplify(db, output_format, base_uri)
