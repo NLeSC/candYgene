@@ -5,7 +5,7 @@
 
 **Key features**
 - process multiple input files in GFF (versions 2 and 3)
-- genome annotations (features) stored in [SQLite] database (https://sqlite.org/)) and serialized as RDF graph(s) in plain text formats:
+- genome annotations (features) stored in [SQLite](https://sqlite.org/) database and serialized as RDF graph(s) in plain text formats:
   - [XML](https://www.w3.org/TR/rdf-syntax-grammar/)
   - [N-Triples](https://www.w3.org/TR/n-triples/)
   - [Turtle](https://www.w3.org/TeamSubmission/turtle/)
