@@ -43,7 +43,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -144,10 +144,10 @@ def triplify(db, fmt, base_uri):
             feature_id = normalize_feature_id(feature.id)
             feature_type = URIRef(feature_onto_class[feature.featuretype])
             feature_parent = URIRef(os.path.join(base_uri, feature.featuretype, feature_id))
-            seqid = URIRef(os.path.join(base_uri, 'chromosome', feature.seqid))
+            seqid = URIRef(os.path.join(base_uri, 'chromosome', str(feature.seqid)))
             region = URIRef(os.path.join(seqid, '%d-%d' %  (feature.start, feature.end)))
-            start = URIRef(os.path.join(seqid, feature.start))
-            end = URIRef(os.path.join(seqid, feature.end))
+            start = URIRef(os.path.join(seqid, str(feature.start)))
+            end = URIRef(os.path.join(seqid, str(feature.end)))
             comment = feature.attributes.get('Note')
             #name = feature.attributes.get('Name')
             label = "{0} {1}".format(feature.featuretype, feature_id)
@@ -167,12 +167,12 @@ def triplify(db, fmt, base_uri):
             # add feature start/end coordinates and strand info to graph
             g.add( (feature_parent, FALDO.location, region) )
             g.add( (region, RDF.type, FALDO.Region) )
-            g.add( (feature_parent, FALDO.begin, start) )
+            g.add( (region, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
             g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.nonNegativeInteger)) )
             g.add( (start, FALDO.reference, seqid) )
-            g.add( (feature_parent, FALDO.end, end) )
+            g.add( (region, FALDO.end, end) )
             g.add( (end, RDF.type, FALDO.ExactPosition) )
             g.add( (end, RDF.type, strand) )
             g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.nonNegativeInteger)) )
