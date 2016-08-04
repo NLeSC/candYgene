@@ -43,23 +43,27 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
 
 def normalize_filext(s):
     """Prefix file extension with a dot '.' if not done already."""
-
     dot = '.'
     if s.startswith(dot) is False:
         s = dot + s
     return s
 
 
+def remove_file(fn):
+    """Remove file if exists."""
+    if os.path.exists(fn) is True:
+        os.remove(fn)
+
+
 def validate_uri(uri):
     """Validate input URI (scheme and host)."""
-
     u = urlparse.urlparse(uri)
     if u.scheme not in ('http', 'https', 'ftp'):
         raise ValueError("Invalid URI scheme used in '%s'." % uri)
@@ -100,7 +104,6 @@ def normalize_feature_id(id):
 
 def triplify(db, fmt, base_uri):
     """Generate RDF triples from RDB using Direct Mapping approach."""
-
     fmt2fext = dict(xml = '.rdf',
                     nt = '.nt',
                     turtle = '.ttl',
@@ -110,14 +113,12 @@ def triplify(db, fmt, base_uri):
         raise IOError("Unsupported RDF serialization '%s'." % fmt)
 
     # define additional namespace prefixes
-    SO = Namespace('http://purl.obolibrary.org/obo/so.owl#')     # Sequence Ontology Feature Annotation
-    FALDO = Namespace('http://biohackathon.org/resource/faldo#') # Feature Annotation Location Description Ontology
-    #EDAM = Namespace('http://edamontology.org/')                 # EMBRACE Data And Methods ontology
-
+    SO = Namespace('http://purl.obolibrary.org/obo/so.owl#')
+    FALDO = Namespace('http://biohackathon.org/resource/faldo#')
     g = Graph()
+
     g.bind('so', SO)
     g.bind('faldo', FALDO)
-    #g.bind('edam', EDAM)
 
     # map feature types and DNA strandedness to ontology classes
     feature_onto_class = {
@@ -135,31 +136,28 @@ def triplify(db, fmt, base_uri):
         '.' : FALDO.Position
     }
 
-    gff.constants.always_return_list = False # GFF attributes (9th column) returned as string
+    gff.constants.always_return_list = False # return GFF attributes as string
 
     for feature in db.all_features():
         if feature.strand not in feature_onto_class:
             raise KeyError("Incorrect strand information for feature ID '%s'." % feature.id)
         try: # skip GFF feature types not in feature_onto_class dict
             strand = feature_onto_class[feature.strand]
+            feature_id = normalize_feature_id(feature.id)
             feature_type = URIRef(feature_onto_class[feature.featuretype])
-            feature_parent = URIRef(validate_uri(os.path.join(base_uri, feature.featuretype, normalize_feature_id(feature.id))))
+            feature_parent = URIRef(os.path.join(base_uri, feature.featuretype, feature_id))
             start = BNode()
             end = BNode()
             comment = feature.attributes.get('Note')
-            name = feature.attributes.get('Name')
-            label = feature.featuretype if name is None else "{0} {1}".format(feature.featuretype, name)
+            #name = feature.attributes.get('Name')
+            label = "{0} {1}".format(feature.featuretype, feature_id)
 
             # add feature types to graph
             g.add( (feature_parent, RDF.type, feature_type) )
-            g.add( (feature_parent, RDFS.label, Literal(label, datatype=XSD.string)) ) # Name attr->rdfs:label
+            g.add( (feature_parent, RDFS.label, Literal(label, datatype=XSD.string)) )
 
             if comment is not None:
-                g.add( (feature_parent, RDFS.comment, Literal(unquote(comment), datatype=XSD.string)) ) # Note attr->rdfs:comment
-
-            # add feature source to graph
-            #g.add( (feature_parent, RDF.type, EDAM.data_3034) ) # sequence feature identifier
-            #g.add( (feature_parent, EDAM.is_output_of, EDAM.operation_2454) ) # Gene prediction
+                g.add( (feature_parent, RDFS.comment, Literal(unquote(comment), datatype=XSD.string)) )
 
             # add chromosome info to graph
             # N.B.: it assumed here that seqid refers to chromosome
@@ -183,7 +181,8 @@ def triplify(db, fmt, base_uri):
 
             # add parent-child relationships between features to graph
             for child in db.children(feature, level=1):
-                feature_child = URIRef(validate_uri(os.path.join(base_uri, child.featuretype, normalize_feature_id(child.id))))
+                feature_id = normalize_feature_id(child.id)
+                feature_child = URIRef(os.path.join(base_uri, child.featuretype, feature_id))
                 g.add( (feature_child, SO.part_of, feature_parent) )
         except KeyError:
             pass
@@ -191,12 +190,6 @@ def triplify(db, fmt, base_uri):
     outfile = os.path.splitext(db.dbfn)[0] + fmt2fext[fmt]
     with open(outfile, 'w') as fout:
         fout.write(g.serialize(format=fmt))
-
-
-def remove_file(fn):
-    """Remove file if exists."""
-    if os.path.exists(fn) is True:
-        os.remove(fn)
 
 
 if __name__ == '__main__':
