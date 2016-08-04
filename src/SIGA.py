@@ -43,7 +43,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -116,7 +116,6 @@ def triplify(db, fmt, base_uri):
     SO = Namespace('http://purl.obolibrary.org/obo/so.owl#')
     FALDO = Namespace('http://biohackathon.org/resource/faldo#')
     g = Graph()
-
     g.bind('so', SO)
     g.bind('faldo', FALDO)
 
@@ -135,7 +134,6 @@ def triplify(db, fmt, base_uri):
         '?' : FALDO.StrandedPosition,
         '.' : FALDO.Position
     }
-
     gff.constants.always_return_list = False # return GFF attributes as string
 
     for feature in db.all_features():
@@ -146,8 +144,10 @@ def triplify(db, fmt, base_uri):
             feature_id = normalize_feature_id(feature.id)
             feature_type = URIRef(feature_onto_class[feature.featuretype])
             feature_parent = URIRef(os.path.join(base_uri, feature.featuretype, feature_id))
-            start = BNode()
-            end = BNode()
+            seqid = URIRef(os.path.join(base_uri, 'chromosome', feature.seqid))
+            region = URIRef(os.path.join(seqid, '%d-%d' %  (feature.start, feature.end)))
+            start = URIRef(os.path.join(seqid, feature.start))
+            end = URIRef(os.path.join(seqid, feature.end))
             comment = feature.attributes.get('Note')
             #name = feature.attributes.get('Name')
             label = "{0} {1}".format(feature.featuretype, feature_id)
@@ -161,12 +161,12 @@ def triplify(db, fmt, base_uri):
 
             # add chromosome info to graph
             # N.B.: it assumed here that seqid refers to chromosome
-            seqid = URIRef(os.path.join(base_uri, 'chromosome', feature.seqid))
             g.add( (seqid, RDF.type, feature_onto_class['chromosome']) )
             g.add( (seqid, RDFS.label, Literal('chromosome %s' % feature.seqid, datatype=XSD.string)) )
 
             # add feature start/end coordinates and strand info to graph
-            g.add( (feature_parent, RDF.type, FALDO.Region) )
+            g.add( (feature_parent, FALDO.location, region) )
+            g.add( (region, RDF.type, FALDO.Region) )
             g.add( (feature_parent, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
@@ -177,13 +177,13 @@ def triplify(db, fmt, base_uri):
             g.add( (end, RDF.type, strand) )
             g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.nonNegativeInteger)) )
             g.add( (end, FALDO.reference, seqid) ) 
-            # TODO: add mandatory phase info to CDS features
+            # TODO: phase info is mandatory for CDS feature types but can't find a corresponding ontology term
 
             # add parent-child relationships between features to graph
             for child in db.children(feature, level=1):
                 feature_id = normalize_feature_id(child.id)
                 feature_child = URIRef(os.path.join(base_uri, child.featuretype, feature_id))
-                g.add( (feature_child, SO.part_of, feature_parent) )
+                g.add( (feature_parent, SO.has_part, feature_child) )
         except KeyError:
             pass
 
