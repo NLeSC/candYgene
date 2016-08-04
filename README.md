@@ -5,14 +5,14 @@
 
 **Key features**
 - process multiple input files in GFF (versions 2 and 3)
-- parsed genome annotations stored in a relational schema ([SQLite](https://sqlite.org/)) and RDF graph(s) in one of the supported serializations (plain text formats):
+- genome annotations (features) stored in [SQLite] database (https://sqlite.org/)) and serialized as RDF graph(s) in plain text formats:
   - [XML](https://www.w3.org/TR/rdf-syntax-grammar/)
   - [N-Triples](https://www.w3.org/TR/n-triples/)
   - [Turtle](https://www.w3.org/TeamSubmission/turtle/)
   - [Notation3](https://www.w3.org/DesignIssues/Notation3.html) (N3)
-- currently supported (hierarchy of) features: *chromosome -> gene -> mRNA -> [CDS, exon, intro, five_prime_UTR, three_prime_UTR]*
-- typed features and their parent-child relations using [SO(FA)](http://www.sequenceontology.org/) and [FALDO](https://github.com/JervenBolleman/FALDO) ontologies
-- ensure referential integrity of data (i.e., parent-child feature relations)
+- (hierarchy of) feature types supported: *chromosome -> gene -> mRNA -> [CDS, exon, intro, five_prime_UTR, three_prime_UTR]*
+- features and their parent-child relations mapped to [SO(FA)](http://www.sequenceontology.org/) and [FALDO](https://github.com/JervenBolleman/FALDO) ontologies
+- parent-child feature relationships checked for referential integrity
 
 **Installation**
 
