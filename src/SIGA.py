@@ -31,6 +31,14 @@ Options:
                      n3 (.n3)
 """
 
+#
+# Supported feature types:
+#   chromosome|gene|mRNA|CDS|three_prime_UTR|five_prime_UTR|intron|exon
+#
+# Defined URI data space relative to base URI:
+#   ../<feature type>/<feature ID> + [#<begin|end>|#<start>-<end>] only for chromosome
+#
+
 from __future__ import print_function
 from docopt import docopt
 from rdflib import Graph, URIRef, Literal, BNode
@@ -43,7 +51,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.2.4'
+__version__ = '0.2.5'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -115,6 +123,8 @@ def triplify(db, fmt, base_uri):
     # define additional namespace prefixes
     SO = Namespace('http://purl.obolibrary.org/obo/so.owl#')
     FALDO = Namespace('http://biohackathon.org/resource/faldo#')
+    DCT = Namespace('http://purl.org/dc/terms/')
+
     g = Graph()
     g.bind('so', SO)
     g.bind('faldo', FALDO)
@@ -145,9 +155,9 @@ def triplify(db, fmt, base_uri):
             feature_type = URIRef(feature_onto_class[feature.featuretype])
             feature_parent = URIRef(os.path.join(base_uri, feature.featuretype, feature_id))
             seqid = URIRef(os.path.join(base_uri, 'chromosome', str(feature.seqid)))
-            region = URIRef(os.path.join(seqid, '%d-%d' %  (feature.start, feature.end)))
-            start = URIRef(os.path.join(seqid, str(feature.start)))
-            end = URIRef(os.path.join(seqid, str(feature.end)))
+            region = URIRef('%s#%d-%d' % (seqid, feature.start, feature.end))
+            start = URIRef('%s#%d' % (seqid, feature.start))
+            end = URIRef('%s#%d' % (seqid, feature.end))
             comment = feature.attributes.get('Note')
             #name = feature.attributes.get('Name')
             label = "{0} {1}".format(feature.featuretype, feature_id)
@@ -184,6 +194,10 @@ def triplify(db, fmt, base_uri):
                 feature_id = normalize_feature_id(child.id)
                 feature_child = URIRef(os.path.join(base_uri, child.featuretype, feature_id))
                 g.add( (feature_parent, SO.has_part, feature_child) )
+
+                if feature.featuretype.lower() == 'gene' and child.featuretype.lower() == 'mrna':
+                    g.add( (feature_parent, SO.transcribed_to, feature_child) )
+
         except KeyError:
             pass
 
