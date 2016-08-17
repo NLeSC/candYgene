@@ -10,8 +10,9 @@
   - [N-Triples](https://www.w3.org/TR/n-triples/)
   - [Turtle](https://www.w3.org/TeamSubmission/turtle/)
   - [Notation3](https://www.w3.org/DesignIssues/Notation3.html) (N3)
-- (hierarchy of) feature types supported: *chromosome -> gene -> mRNA -> [CDS, exon, intro, five_prime_UTR, three_prime_UTR]*
-- features and their parent-child relations mapped to [SO(FA)](http://www.sequenceontology.org/) and [FALDO](https://github.com/JervenBolleman/FALDO) ontologies
+- supported feature (keys) types: *genome, chromosome, gene, prim_transcript, mRNA, CDS, exon, intro, five_prime_UTR, three_prime_UTR, polyA_site, polyA_sequence*
+- supported feature relations ([SO(FA)](http://www.sequenceontology.org/) properties): _has_part_ and its inverse _part_of_, _transcribed_to_, _genome_of_
+- sequence feature locations described by [FALDO](https://github.com/JervenBolleman/FALDO)
 - parent-child feature relationships checked for referential integrity
 
 **Installation**
@@ -38,7 +39,7 @@ Generate RDF triples in Turtle format (default) from a GFF file (two-steps):
 
 `python SIGA.py db -cV ITAG2.4_gene_models.gff3` # GFF->DB
 
-`python SIGA.py rdf -b https://solgenomics.net ITAG2.4_gene_models.db` # DB->RDF
+`python SIGA.py rdf -b https://solgenomics.net ITAG2.4_gene_models.db` -s "Solanum lycopersicum" -t 4081 # DB->RDF
 
 Summary of I/O files:
 
