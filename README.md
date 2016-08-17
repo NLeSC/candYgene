@@ -39,7 +39,7 @@ Generate RDF triples in Turtle format (default) from a GFF file (two-steps):
 
 `python SIGA.py db -cV ITAG2.4_gene_models.gff3` # GFF->DB
 
-`python SIGA.py rdf -b https://solgenomics.net ITAG2.4_gene_models.db` -s "Solanum lycopersicum" -t 4081 # DB->RDF
+`python SIGA.py rdf -b https://solgenomics.net ITAG2.4_gene_models.db -s "Solanum lycopersicum" -t 4081` # DB->RDF
 
 Summary of I/O files:
 
