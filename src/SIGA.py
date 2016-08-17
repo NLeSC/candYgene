@@ -10,7 +10,7 @@ Usage:
   SIGA.py -h|--help
   SIGA.py -v|--version
   SIGA.py db [-cV] [-d DB_FILE|-e DB_FILEXT] GFF_FILE...
-  SIGA.py rdf [-V] [-o FORMAT] -b BASE_URI DB_FILE...
+  SIGA.py rdf [-V] [-o FORMAT] -b BASE_URI -s SPECIES_NAME -t TAXON_ID DB_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF version 2 or 3.
@@ -21,6 +21,10 @@ Options:
   -v, --version
   -V, --verbose    Use for debugging.
   -b BASE_URI      Set the base URI (e.g. https://solgenomics.net/).
+  -s SPECIES_NAME  Set the species name of the annotated genome.
+                   (e.g. Solanum lycopersicum)
+  -t TAX_ID        Set the NCBI Taxonomy ID of the species.
+                   (e.g. 4081)
   -d DB_FILE       Populate a database from GFF file(s).
   -e DB_FILEXT     Set the database file extension [default: .db].
   -c               Check the referential integrity of the database(s).
@@ -33,7 +37,8 @@ Options:
 
 #
 # Supported feature types:
-#   chromosome|gene|mRNA|CDS|three_prime_UTR|five_prime_UTR|intron|exon
+#   genome, chromosome, gene, prim_transcript, mRNA, intron, exon, CDS,
+#   three_prime_UTR, five_prime_UTR, polyA_site, polyA_sequence
 #
 # Defined URI data space relative to base URI:
 #   ../<feature type>/<feature ID> + [#<begin|end>|#<start>-<end>] only for chromosome
@@ -51,7 +56,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.2.5'
+__version__ = '0.3.0'
 __status__  = 'Prototype'
 __license__ = 'Apache License, Version 2.0'
 
@@ -110,7 +115,7 @@ def normalize_feature_id(id):
     return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', id)
 
 
-def triplify(db, fmt, base_uri):
+def triplify(db, fmt, base_uri, species, taxon_id):
     """Generate RDF triples from RDB using Direct Mapping approach."""
     fmt2fext = dict(xml = '.rdf',
                     nt = '.nt',
@@ -121,30 +126,50 @@ def triplify(db, fmt, base_uri):
         raise IOError("Unsupported RDF serialization '%s'." % fmt)
 
     # define additional namespace prefixes
-    SO = Namespace('http://purl.obolibrary.org/obo/so.owl#')
+    SO = Namespace('http://purl.obolibrary.org/obo/so.owl#') # FIXME: URI resolution of classes/properties
     FALDO = Namespace('http://biohackathon.org/resource/faldo#')
-    DCT = Namespace('http://purl.org/dc/terms/')
+    TAXON = Namespace('http://purl.bioontology.org/ontology/NCBITAXON/')
 
     g = Graph()
     g.bind('so', SO)
     g.bind('faldo', FALDO)
+    g.bind('taxon', TAXON)
 
-    # map feature types and DNA strandedness to ontology classes
+    # map GFF feature types and DNA strandedness to ontology classes
+    # Note: The 'mRNA' feature key is often used (incorrectly) in place of 'prim_transcript'
+    # in genome annotations. The former feature MUST NOT contain introns while the latter
+    # MAY contain introns (see DDBJ/ENA/GenBank Feature Table Definition, http://www.insdc.org/)
+    # FT to SO mappings:
+    #   prim_transcript -> SO:0000120 refers to a protein-coding primary (unprocessed) transcript
+    #   mRNA            -> SO_0000234 refers to a mature transcript
+    #
     feature_onto_class = {
-        'gene' : SO.SO_0000704,
-        'mRNA' : SO.SO_0000234,
-        'CDS'  : SO.SO_0000316,
-        'exon' : SO.SO_0000147,
-        'intron' : SO.SO_0000188,
-        'five_prime_UTR' : SO.SO_0000204,
+        'genome'          : SO.SO_0001026,
+        'chromosome'      : SO.SO_0000340,
+        'gene'            : SO.SO_0000704,
+        'prim_transcript' : SO.SO_0000120,
+        'mRNA'            : SO.SO_0000120, # N.B.
+        'CDS'             : SO.SO_0000316,
+        'exon'            : SO.SO_0000147,
+        'intron'          : SO.SO_0000188,
+        'five_prime_UTR'  : SO.SO_0000204,
         'three_prime_UTR' : SO.SO_0000205,
-        'chromosome' : SO.SO_0000340,
+        'polyA_site'      : SO.SO_0000553,
+        'polyA_sequence'  : SO.SO_0000610,
         '+' : FALDO.ForwardStrandPosition,
         '-' : FALDO.ReverseStrandPosition,
         '?' : FALDO.StrandedPosition,
         '.' : FALDO.Position
     }
     gff.constants.always_return_list = False # return GFF attributes as string
+
+    # add genome info to graph
+    genome = URIRef(os.path.join(base_uri, 'genome', species.replace(' ', '_')))
+    taxon = TAXON.term(str(taxon_id))
+    g.add( (genome, RDF.type, feature_onto_class['genome']) )
+    g.add( (genome, RDFS.label, Literal('%s genome' % species, datatype=XSD.string)) )
+    g.add( (genome, SO.genome_of, taxon) )
+    g.add( (taxon, RDFS.label, Literal('NCBI Taxonomy ID: %d' % taxon_id, datatype=XSD.string)) )
 
     for feature in db.all_features():
         if feature.strand not in feature_onto_class:
@@ -162,17 +187,18 @@ def triplify(db, fmt, base_uri):
             #name = feature.attributes.get('Name')
             label = "{0} {1}".format(feature.featuretype, feature_id)
 
+            # add genome and chromosome info to graph
+            # Note: the assumption here is that seqid field refers to chromosome
+            g.add( (seqid, RDF.type, feature_onto_class['chromosome']) )
+            g.add( (seqid, RDFS.label, Literal('chromosome %s' % feature.seqid, datatype=XSD.string)) )
+            g.add( (seqid, SO.part_of, genome) )
+
             # add feature types to graph
             g.add( (feature_parent, RDF.type, feature_type) )
             g.add( (feature_parent, RDFS.label, Literal(label, datatype=XSD.string)) )
 
             if comment is not None:
                 g.add( (feature_parent, RDFS.comment, Literal(unquote(comment), datatype=XSD.string)) )
-
-            # add chromosome info to graph
-            # N.B.: it assumed here that seqid refers to chromosome
-            g.add( (seqid, RDF.type, feature_onto_class['chromosome']) )
-            g.add( (seqid, RDFS.label, Literal('chromosome %s' % feature.seqid, datatype=XSD.string)) )
 
             # add feature start/end coordinates and strand info to graph
             g.add( (feature_parent, FALDO.location, region) )
@@ -193,9 +219,9 @@ def triplify(db, fmt, base_uri):
             for child in db.children(feature, level=1):
                 feature_id = normalize_feature_id(child.id)
                 feature_child = URIRef(os.path.join(base_uri, child.featuretype, feature_id))
-                g.add( (feature_parent, SO.has_part, feature_child) )
+                g.add( (feature_parent, SO.has_part, feature_child) ) # use the inverse of part_of
 
-                if feature.featuretype.lower() == 'gene' and child.featuretype.lower() == 'mrna':
+                if feature.featuretype == 'gene' and child.featuretype in ('mRNA', 'prim_transcript'):
                     g.add( (feature_parent, SO.transcribed_to, feature_child) )
 
         except KeyError:
@@ -241,9 +267,15 @@ if __name__ == '__main__':
     else: # in rdf mode
         base_uri = validate_uri(args['-b'])
         output_format = args['-o']
+        species = args['-s']
+        taxon_id = args['-t']
+        try:
+            taxon_id = int(taxon_id)
+        except:
+            raise ValueError('Enter valid NCBI Taxonomy ID.')
 
         # serialize RDF graphs from db files
         for db_file in args['DB_FILE']:
             db = gff.FeatureDB(db_file)
-            triplify(db, output_format, base_uri)
+            triplify(db, output_format, base_uri, species, taxon_id)
 
