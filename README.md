@@ -10,7 +10,7 @@
   - [N-Triples](https://www.w3.org/TR/n-triples/)
   - [Turtle](https://www.w3.org/TeamSubmission/turtle/)
   - [Notation3](https://www.w3.org/DesignIssues/Notation3.html) (N3)
-- supported feature (keys) types: *genome, chromosome, gene, prim_transcript, mRNA, CDS, exon, intro, five_prime_UTR, three_prime_UTR, polyA_site, polyA_sequence*
+- supported feature (keys) types: *genome, chromosome, gene, prim_transcript, mRNA, CDS, exon, intron, five_prime_UTR, three_prime_UTR, polyA_site, polyA_sequence*
 - supported feature relations ([SO(FA)](http://www.sequenceontology.org/) properties): _has_part_ and its inverse _part_of_, _transcribed_to_, _genome_of_
 - sequence feature locations described by [FALDO](https://github.com/JervenBolleman/FALDO)
 - parent-child feature relationships checked for referential integrity
