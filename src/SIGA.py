@@ -10,7 +10,7 @@ Usage:
   SIGA.py -h|--help
   SIGA.py -v|--version
   SIGA.py db [-cV] [-d DB_FILE|-e DB_FILEXT] GFF_FILE...
-  SIGA.py rdf [-V] [-o FORMAT] -b BASE_URI -s SPECIES_NAME -t TAXON_ID DB_FILE...
+  SIGA.py rdf [-V] [-o FORMAT] -b BASE_URI -D DOWNLOAD_URL -s SPECIES_NAME -t TAXON_ID DB_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF version 2 or 3.
@@ -21,10 +21,9 @@ Options:
   -v, --version
   -V, --verbose    Use for debugging.
   -b BASE_URI      Set the base URI (e.g. https://solgenomics.net/).
-  -s SPECIES_NAME  Set the species name of the annotated genome.
-                   (e.g. Solanum lycopersicum)
-  -t TAX_ID        Set the NCBI Taxonomy ID of the species.
-                   (e.g. 4081)
+  -D DOWNLOAD_URL  Set the (source) download URL of the input data.
+  -s SPECIES_NAME  Set the species name of the annotated genome (e.g. Solanum lycopersicum).
+  -t TAX_ID        Set the NCBI Taxonomy ID of the species (e.g. 4081).
   -d DB_FILE       Populate a database from GFF file(s).
   -e DB_FILEXT     Set the database file extension [default: .db].
   -c               Check the referential integrity of the database(s).
@@ -47,7 +46,7 @@ Options:
 from __future__ import print_function
 from docopt import docopt
 from rdflib import Graph, URIRef, Literal, BNode
-from rdflib.namespace import Namespace, RDF, RDFS, XSD
+from rdflib.namespace import Namespace, RDF, RDFS, XSD, DCTERMS
 from urllib2 import urlparse, unquote
 
 import os
@@ -56,8 +55,8 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.3.0'
-__status__  = 'Prototype'
+__version__ = '0.3.1'
+__status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
 
 
@@ -115,15 +114,15 @@ def normalize_feature_id(id):
     return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', id)
 
 
-def triplify(db, fmt, base_uri, species, taxon_id):
+def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
     """Generate RDF triples from RDB using Direct Mapping approach."""
     fmt2fext = dict(xml = '.rdf',
                     nt = '.nt',
                     turtle = '.ttl',
                     n3 = '.n3')
 
-    if fmt not in fmt2fext:
-        raise IOError("Unsupported RDF serialization '%s'." % fmt)
+    if rdf_format not in fmt2fext:
+        raise IOError("Unsupported RDF serialization '%s'." % rdf_format)
 
     # define additional namespace prefixes
     SO = Namespace('http://purl.obolibrary.org/obo/so.owl#') # FIXME: URI resolution of classes/properties
@@ -134,6 +133,7 @@ def triplify(db, fmt, base_uri, species, taxon_id):
     g.bind('so', SO)
     g.bind('faldo', FALDO)
     g.bind('taxon', TAXON)
+    g.bind('dct', DCTERMS)
 
     # map GFF feature types and DNA strandedness to ontology classes
     # Note: The 'mRNA' feature key is often used (incorrectly) in place of 'prim_transcript'
@@ -164,12 +164,16 @@ def triplify(db, fmt, base_uri, species, taxon_id):
     gff.constants.always_return_list = False # return GFF attributes as string
 
     # add genome info to graph
-    genome = URIRef(os.path.join(base_uri, 'genome', species.replace(' ', '_')))
+    genome = URIRef(os.path.join(base_uri, 'genome', species_name.replace(' ', '_')))
     taxon = TAXON.term(str(taxon_id))
     g.add( (genome, RDF.type, feature_onto_class['genome']) )
-    g.add( (genome, RDFS.label, Literal('%s genome' % species, datatype=XSD.string)) )
+    g.add( (genome, RDF.type, DCTERMS.Dataset) )
+    g.add( (genome, RDFS.label, Literal('%s genome' % species_name, datatype=XSD.string)) )
+    g.add( (genome, DCTERMS.title, Literal('%s genome' % species_name, datatype=XSD.string)) )
+    g.add( (genome, DCTERMS.source, URIRef(download_url)) )
     g.add( (genome, SO.genome_of, taxon) )
     g.add( (taxon, RDFS.label, Literal('NCBI Taxonomy ID: %d' % taxon_id, datatype=XSD.string)) )
+    g.add( (taxon, RDF.value, Literal(taxon_id, datatype=XSD.positiveInteger)) )
 
     for feature in db.all_features():
         if feature.strand not in feature_onto_class:
@@ -206,12 +210,12 @@ def triplify(db, fmt, base_uri, species, taxon_id):
             g.add( (region, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
-            g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.nonNegativeInteger)) )
+            g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.positiveInteger)) )
             g.add( (start, FALDO.reference, seqid) )
             g.add( (region, FALDO.end, end) )
             g.add( (end, RDF.type, FALDO.ExactPosition) )
             g.add( (end, RDF.type, strand) )
-            g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.nonNegativeInteger)) )
+            g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.positiveInteger)) )
             g.add( (end, FALDO.reference, seqid) ) 
             # TODO: phase info is mandatory for CDS feature types but can't find a corresponding ontology term
 
@@ -227,9 +231,9 @@ def triplify(db, fmt, base_uri, species, taxon_id):
         except KeyError:
             pass
 
-    outfile = os.path.splitext(db.dbfn)[0] + fmt2fext[fmt]
+    outfile = os.path.splitext(db.dbfn)[0] + fmt2fext[rdf_format]
     with open(outfile, 'w') as fout:
-        fout.write(g.serialize(format=fmt))
+        fout.write(g.serialize(format=rdf_format))
 
 
 if __name__ == '__main__':
@@ -266,8 +270,9 @@ if __name__ == '__main__':
                     raise IOError("%s in database '%s'." % (e, db_file))
     else: # in rdf mode
         base_uri = validate_uri(args['-b'])
-        output_format = args['-o']
-        species = args['-s']
+        download_url = validate_uri(args['-D'])
+        rdf_format = args['-o']
+        species_name = args['-s']
         taxon_id = args['-t']
         try:
             taxon_id = int(taxon_id)
@@ -277,5 +282,5 @@ if __name__ == '__main__':
         # serialize RDF graphs from db files
         for db_file in args['DB_FILE']:
             db = gff.FeatureDB(db_file)
-            triplify(db, output_format, base_uri, species, taxon_id)
+            triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id)
 
