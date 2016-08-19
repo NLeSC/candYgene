@@ -48,6 +48,7 @@ from docopt import docopt
 from rdflib import Graph, URIRef, Literal, BNode
 from rdflib.namespace import Namespace, RDF, RDFS, XSD, DCTERMS
 from urllib2 import urlparse, unquote
+from datetime import datetime
 
 import os
 import re
@@ -55,7 +56,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 __status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
 
@@ -167,9 +168,9 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
     genome = URIRef(os.path.join(base_uri, 'genome', species_name.replace(' ', '_')))
     taxon = TAXON.term(str(taxon_id))
     g.add( (genome, RDF.type, feature_onto_class['genome']) )
-    g.add( (genome, RDF.type, DCTERMS.Dataset) )
-    g.add( (genome, RDFS.label, Literal('%s genome' % species_name, datatype=XSD.string)) )
-    g.add( (genome, DCTERMS.title, Literal('%s genome' % species_name, datatype=XSD.string)) )
+    g.add( (genome, DCTERMS.created, Literal(datetime.now().strftime("%Y-%m-%d"), datatype=XSD.date )) )
+    for pred in (RDFS.label, DCTERMS.title):
+        g.add( (genome, pred, Literal('genome of %s' % species_name, datatype=XSD.string)) )
     g.add( (genome, DCTERMS.source, URIRef(download_url)) )
     g.add( (genome, SO.genome_of, taxon) )
     g.add( (taxon, RDFS.label, Literal('NCBI Taxonomy ID: %d' % taxon_id, datatype=XSD.string)) )
@@ -184,12 +185,17 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
             feature_type = URIRef(feature_onto_class[feature.featuretype])
             feature_parent = URIRef(os.path.join(base_uri, feature.featuretype, feature_id))
             seqid = URIRef(os.path.join(base_uri, 'chromosome', str(feature.seqid)))
-            region = URIRef('%s#%d-%d' % (seqid, feature.start, feature.end))
-            start = URIRef('%s#%d' % (seqid, feature.start))
-            end = URIRef('%s#%d' % (seqid, feature.end))
+            region = URIRef('{0}#{1}-{2}'.format(seqid, feature.start, feature.end))
+            start = URIRef('{0}#{1}'.format(seqid, feature.start))
+            end = URIRef('{0}#{1}'.format(seqid, feature.end))
             comment = feature.attributes.get('Note')
-            #name = feature.attributes.get('Name')
-            label = "{0} {1}".format(feature.featuretype, feature_id)
+            label = '{0} {1}'.format(feature.featuretype.replace('_', ' '), feature_id)
+            seealso = 'https://solgenomics.net/jbrowse_solgenomics/?data=data/json/'
+            seealso += '{0}&loc={1}:{2}..{3}&tracks=DNA,gene_models'.format(re.split('ch\d+$', feature.seqid)[0],
+                                                                            feature.seqid,
+                                                                            feature.start,
+                                                                            feature.end)
+            seealso = URIRef(seealso)
 
             # add genome and chromosome info to graph
             # Note: the assumption here is that seqid field refers to chromosome
@@ -206,15 +212,22 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
 
             # add feature start/end coordinates and strand info to graph
             g.add( (feature_parent, FALDO.location, region) )
+            g.add( (feature_parent, RDFS.seeAlso, seealso) )
+            g.add( (seealso, RDFS.label, Literal('View this feature on the genome', datatype=XSD.string)) )
             g.add( (region, RDF.type, FALDO.Region) )
+            g.add( (region, RDFS.label, Literal('chromosome {0} region {1}-{2}'.format(feature.seqid,
+                                                                                       feature.start,
+                                                                                       feature.end))) )
             g.add( (region, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
+            g.add( (start, RDFS.label, Literal('chromosome {0} position {1}'.format(feature.seqid, feature.start))) )
             g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.positiveInteger)) )
             g.add( (start, FALDO.reference, seqid) )
             g.add( (region, FALDO.end, end) )
             g.add( (end, RDF.type, FALDO.ExactPosition) )
             g.add( (end, RDF.type, strand) )
+            g.add( (end, RDFS.label, Literal('chromosome {0} position {1}'.format(feature.seqid, feature.end))) )
             g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.positiveInteger)) )
             g.add( (end, FALDO.reference, seqid) ) 
             # TODO: phase info is mandatory for CDS feature types but can't find a corresponding ontology term
