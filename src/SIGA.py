@@ -10,7 +10,7 @@ Usage:
   SIGA.py -h|--help
   SIGA.py -v|--version
   SIGA.py db [-cV] [-d DB_FILE|-e DB_FILEXT] GFF_FILE...
-  SIGA.py rdf [-V] [-o FORMAT] -b BASE_URI -D DOWNLOAD_URL -s SPECIES_NAME -t TAXON_ID DB_FILE...
+  SIGA.py rdf [-V] [-o FORMAT] -b BASE_URI -D URL -g NAME -t ID DB_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF version 2 or 3.
@@ -21,10 +21,10 @@ Options:
   -v, --version
   -V, --verbose    Use for debugging.
   -b BASE_URI      Set the base URI (e.g. https://solgenomics.net/).
-  -D DOWNLOAD_URL  Set the (source) download URL of the input data.
-  -s SPECIES_NAME  Set the species name of the annotated genome (e.g. Solanum lycopersicum).
-  -t TAX_ID        Set the NCBI Taxonomy ID of the species (e.g. 4081).
-  -d DB_FILE       Populate a database from GFF file(s).
+  -D URL           Set the download URL of GFF file(s).
+  -g NAME          Set the genome or species name (e.g. Solanum lycopersicum).
+  -t ID            Set the NCBI Taxonomy ID of the species (e.g. 4081).
+  -d DB_FILE       Create a database from GFF file(s).
   -e DB_FILEXT     Set the database file extension [default: .db].
   -c               Check the referential integrity of the database(s).
   -o FORMAT        Select RDF output format:
@@ -56,7 +56,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.3.3'
+__version__ = '0.3.4'
 __status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
 
@@ -123,7 +123,7 @@ def get_feature_attr(feature, attr):
         try:
             return feature[attr.lower()]
         except KeyError:
-            return ''
+            return None
 
 
 def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
@@ -217,12 +217,16 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
             g.add( (feature_parent, RDFS.label, Literal(label, datatype=XSD.string)) )
 
             # add feature description to graph
-            desc = ''
+            arr = []
             for attr in ('Note', 'Name'):
-                desc += get_feature_attr(feature, attr)
+                el = get_feature_attr(feature, attr)
+                if el is not None:
+                    arr.append(str(el))
 
-            if desc not in ('', feature_id):
-                g.add( (feature_parent, RDFS.comment, Literal(unquote(desc), datatype=XSD.string)) )
+            if len(arr) != 0:
+                desc = unquote(' '.join(arr))
+                if desc != feature_id:
+                    g.add( (feature_parent, RDFS.comment, Literal(desc, datatype=XSD.string)) )
 
             # add feature start/end coordinates and strand info to graph
             g.add( (feature_parent, FALDO.location, region) )
@@ -303,7 +307,7 @@ if __name__ == '__main__':
         base_uri = validate_uri(args['-b'])
         download_url = validate_uri(args['-D'])
         rdf_format = args['-o']
-        species_name = args['-s']
+        species_name = args['-g']
         taxon_id = args['-t']
         try:
             taxon_id = int(taxon_id)
