@@ -56,7 +56,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.3.2'
+__version__ = '0.3.3'
 __status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
 
@@ -115,6 +115,17 @@ def normalize_feature_id(id):
     return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', id)
 
 
+def get_feature_attr(feature, attr):
+    """Get feature attribute."""
+    try:
+        return feature[attr]
+    except KeyError:
+        try:
+            return feature[attr.lower()]
+        except KeyError:
+            return ''
+
+
 def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
     """Generate RDF triples from RDB using Direct Mapping approach."""
     fmt2fext = dict(xml = '.rdf',
@@ -123,7 +134,7 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
                     n3 = '.n3')
 
     if rdf_format not in fmt2fext:
-        raise IOError("Unsupported RDF serialization '%s'." % rdf_format)
+        raise IOError("Unsupported RDF serialization '{0}'.".format(rdf_format))
 
     # define additional namespace prefixes
     SO = Namespace('http://purl.obolibrary.org/obo/so.owl#') # FIXME: URI resolution of classes/properties
@@ -170,15 +181,15 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
     g.add( (genome, RDF.type, feature_onto_class['genome']) )
     g.add( (genome, DCTERMS.created, Literal(datetime.now().strftime("%Y-%m-%d"), datatype=XSD.date )) )
     for pred in (RDFS.label, DCTERMS.title):
-        g.add( (genome, pred, Literal('genome of %s' % species_name, datatype=XSD.string)) )
+        g.add( (genome, pred, Literal('genome of {0}'.format(species_name), datatype=XSD.string)) )
     g.add( (genome, DCTERMS.source, URIRef(download_url)) )
     g.add( (genome, SO.genome_of, taxon) )
-    g.add( (taxon, RDFS.label, Literal('NCBI Taxonomy ID: %d' % taxon_id, datatype=XSD.string)) )
+    g.add( (taxon, RDFS.label, Literal('NCBI Taxonomy ID: {0}'.format(taxon_id), datatype=XSD.string)) )
     g.add( (taxon, RDF.value, Literal(taxon_id, datatype=XSD.positiveInteger)) )
 
     for feature in db.all_features():
         if feature.strand not in feature_onto_class:
-            raise KeyError("Incorrect strand information for feature ID '%s'." % feature.id)
+            raise KeyError("Incorrect strand information for feature ID '{0}'.".format(feature.id))
         try: # skip GFF feature types not in feature_onto_class dict
             strand = feature_onto_class[feature.strand]
             feature_id = normalize_feature_id(feature.id)
@@ -188,49 +199,56 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
             region = URIRef('{0}#{1}-{2}'.format(seqid, feature.start, feature.end))
             start = URIRef('{0}#{1}'.format(seqid, feature.start))
             end = URIRef('{0}#{1}'.format(seqid, feature.end))
-            comment = feature.attributes.get('Note')
             label = '{0} {1}'.format(feature.featuretype.replace('_', ' '), feature_id)
-            seealso = 'https://solgenomics.net/jbrowse_solgenomics/?data=data/json/'
-            seealso += '{0}&loc={1}:{2}..{3}&tracks=DNA,gene_models'.format(re.split('ch\d+$', feature.seqid)[0],
-                                                                            feature.seqid,
-                                                                            feature.start,
-                                                                            feature.end)
-            seealso = URIRef(seealso)
+            seealso = ''
+            if 'lycopersicum' in species_name:
+                seealso = 'https://solgenomics.net/jbrowse_solgenomics/?data=data/json/{0}&loc={1}&tracks=DNA,gene_models'.format(re.split('ch\d+$', feature.seqid)[0], feature_id)
+            elif 'tuberosum' in species_name:
+                seealso = 'http://solanaceae.plantbiology.msu.edu/cgi-bin/gbrowse/potato/?name={0}'.format(feature.id)
 
             # add genome and chromosome info to graph
             # Note: the assumption here is that seqid field refers to chromosome
             g.add( (seqid, RDF.type, feature_onto_class['chromosome']) )
-            g.add( (seqid, RDFS.label, Literal('chromosome %s' % feature.seqid, datatype=XSD.string)) )
+            g.add( (seqid, RDFS.label, Literal('chromosome {0}'.format(feature.seqid), datatype=XSD.string)) )
             g.add( (seqid, SO.part_of, genome) )
 
             # add feature types to graph
             g.add( (feature_parent, RDF.type, feature_type) )
             g.add( (feature_parent, RDFS.label, Literal(label, datatype=XSD.string)) )
 
-            if comment is not None:
-                g.add( (feature_parent, RDFS.comment, Literal(unquote(comment), datatype=XSD.string)) )
+            # add feature description to graph
+            desc = ''
+            for attr in ('Note', 'Name'):
+                desc += get_feature_attr(feature, attr)
+
+            if desc not in ('', feature_id):
+                g.add( (feature_parent, RDFS.comment, Literal(unquote(desc), datatype=XSD.string)) )
 
             # add feature start/end coordinates and strand info to graph
             g.add( (feature_parent, FALDO.location, region) )
-            g.add( (feature_parent, RDFS.seeAlso, seealso) )
-            g.add( (seealso, RDFS.label, Literal('View this feature on the genome', datatype=XSD.string)) )
             g.add( (region, RDF.type, FALDO.Region) )
-            g.add( (region, RDFS.label, Literal('chromosome {0} region {1}-{2}'.format(feature.seqid,
-                                                                                       feature.start,
-                                                                                       feature.end))) )
+            g.add( (region, RDFS.label, Literal('region {0}-{1} on chromosome {2}'.format(feature.start,
+                                                                                          feature.end,
+                                                                                          feature.seqid))) )
             g.add( (region, FALDO.begin, start) )
             g.add( (start, RDF.type, FALDO.ExactPosition) )
             g.add( (start, RDF.type, strand) )
-            g.add( (start, RDFS.label, Literal('chromosome {0} position {1}'.format(feature.seqid, feature.start))) )
+            g.add( (start, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.start, feature.seqid))) )
             g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.positiveInteger)) )
             g.add( (start, FALDO.reference, seqid) )
             g.add( (region, FALDO.end, end) )
             g.add( (end, RDF.type, FALDO.ExactPosition) )
             g.add( (end, RDF.type, strand) )
-            g.add( (end, RDFS.label, Literal('chromosome {0} position {1}'.format(feature.seqid, feature.end))) )
+            g.add( (end, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.end, feature.seqid))) )
             g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.positiveInteger)) )
             g.add( (end, FALDO.reference, seqid) ) 
             # TODO: phase info is mandatory for CDS feature types but can't find a corresponding ontology term
+
+            # add link to genome browser
+            if feature.featuretype == 'gene' and seealso != '':
+                seealso = URIRef(seealso)
+                g.add( (feature_parent, RDFS.seeAlso, seealso) )
+                g.add( (seealso, RDFS.label, Literal('Genome browser', datatype=XSD.string)) )
 
             # add parent-child relationships between features to graph
             for child in db.children(feature, level=1):
