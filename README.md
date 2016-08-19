@@ -27,19 +27,27 @@
 
 `cd examples`
 
-or download the latest tomato genome annotations (ITAG2.4 release) in GFF files from the [Sol Genomics Network](https://solgenomics.net) (SGN).
+or download the latest genome annotations for tomato (ITAG v2.4) or potato (PGSC v4.03)
 
 `wget ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3`
+
+`wget http://solanaceae.plantbiology.msu.edu/data/PGSC_DM_V403_genes.gff.zip`
 
 **Example usage**
 
 `cd src`
 
-Generate RDF triples in Turtle format (default) from a GFF file (two-steps):
+Generate RDF triples in Turtle format (default) from a GFF file in two steps.
 
-`python SIGA.py db -cV ITAG2.4_gene_models.gff3` # GFF->DB
+GFF to DB: `python SIGA.py db -cV ITAG2.4_gene_models.gff3`
 
-`python SIGA.py rdf -b https://solgenomics.net ITAG2.4_gene_models.db -s "Solanum lycopersicum" -t 4081` # DB->RDF
+DB to RDF: 
+`python src/SIGA.py rdf
+-b https://solgenomics.net
+-D ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3
+-s "Solanum lycopersicum"
+-t 4081
+ITAG2.4_gene_models`
 
 Summary of I/O files:
 
