@@ -47,7 +47,7 @@ DB to RDF:
 -D ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3
 -s "Solanum lycopersicum"
 -t 4081
-ITAG2.4_gene_models`
+ITAG2.4_gene_models.db`
 
 Summary of I/O files:
 
