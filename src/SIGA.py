@@ -9,7 +9,7 @@ References:
 Usage:
   SIGA.py -h|--help
   SIGA.py -v|--version
-  SIGA.py db [-cV] [-d DB_FILE|-e DB_FILEXT] GFF_FILE...
+  SIGA.py db [-cuV] [-d DB_FILE|-e DB_FILEXT] GFF_FILE...
   SIGA.py rdf [-V] [-o FORMAT] -b BASE_URI -D URL -g NAME -t ID DB_FILE...
 
 Arguments:
@@ -27,6 +27,7 @@ Options:
   -d DB_FILE       Create a database from GFF file(s).
   -e DB_FILEXT     Set the database file extension [default: .db].
   -c               Check the referential integrity of the database(s).
+  -u               Generate unique feature IDs if duplicates found.
   -o FORMAT        Select RDF output format:
                      turtle (.ttl) [default: turtle]
                      xml (.rdf),
@@ -56,7 +57,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.3.4'
+__version__ = '0.3.5'
 __status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
 
@@ -139,8 +140,7 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
     # define additional namespace prefixes
     SO = Namespace('http://purl.obolibrary.org/obo/so.owl#') # FIXME: URI resolution of classes/properties
     FALDO = Namespace('http://biohackathon.org/resource/faldo#')
-    TAXON = Namespace('http://purl.bioontology.org/ontology/NCBITAXON/')
-
+    TAXON = Namespace('http://purl.obolibrary.org/obo/ncbitaxon.owl#')
     g = Graph()
     g.bind('so', SO)
     g.bind('faldo', FALDO)
@@ -178,6 +178,7 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
     # add genome info to graph
     genome = URIRef(os.path.join(base_uri, 'genome', species_name.replace(' ', '_')))
     taxon = TAXON.term(str(taxon_id))
+
     g.add( (genome, RDF.type, feature_onto_class['genome']) )
     g.add( (genome, DCTERMS.created, Literal(datetime.now().strftime("%Y-%m-%d"), datatype=XSD.date )) )
     for pred in (RDFS.label, DCTERMS.title):
@@ -200,14 +201,9 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
             start = URIRef('{0}#{1}'.format(seqid, feature.start))
             end = URIRef('{0}#{1}'.format(seqid, feature.end))
             label = '{0} {1}'.format(feature.featuretype.replace('_', ' '), feature_id)
-            seealso = ''
-            if 'lycopersicum' in species_name:
-                seealso = 'https://solgenomics.net/jbrowse_solgenomics/?data=data/json/{0}&loc={1}&tracks=DNA,gene_models'.format(re.split('ch\d+$', feature.seqid)[0], feature_id)
-            elif 'tuberosum' in species_name:
-                seealso = 'http://solanaceae.plantbiology.msu.edu/cgi-bin/gbrowse/potato/?name={0}'.format(feature.id)
 
             # add genome and chromosome info to graph
-            # Note: the assumption here is that seqid field refers to chromosome
+            # Note: the assumption is that the `seqid` field refers to chromosome
             g.add( (seqid, RDF.type, feature_onto_class['chromosome']) )
             g.add( (seqid, RDFS.label, Literal('chromosome {0}'.format(feature.seqid), datatype=XSD.string)) )
             g.add( (seqid, SO.part_of, genome) )
@@ -248,12 +244,6 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
             g.add( (end, FALDO.reference, seqid) ) 
             # TODO: phase info is mandatory for CDS feature types but can't find a corresponding ontology term
 
-            # add link to genome browser
-            if feature.featuretype == 'gene' and seealso != '':
-                seealso = URIRef(seealso)
-                g.add( (feature_parent, RDFS.seeAlso, seealso) )
-                g.add( (seealso, RDFS.label, Literal('Genome browser', datatype=XSD.string)) )
-
             # add parent-child relationships between features to graph
             for child in db.children(feature, level=1):
                 feature_id = normalize_feature_id(child.id)
@@ -277,6 +267,7 @@ if __name__ == '__main__':
     debug = args['--verbose']
 
     if args['db'] is True: # in db mode
+        unique_keys = 'create_unique' if args['-u'] is True else 'error'
         fk_check = 'ON' if args['-c'] is True else 'OFF'
         pragmas = dict(foreign_keys=fk_check)
 
@@ -284,7 +275,7 @@ if __name__ == '__main__':
         for gff_file in args['GFF_FILE']:
             if os.path.exists(gff_file) is False:
                remove_file(db_file)
-               raise IOError("GFF file '%s' not found." % gff_file)
+               raise IOError("GFF file '{0}' not found.".format(gff_file))
 
             if args['-d']: # one db for all GFF files
                 db_file = args['-d']
@@ -292,17 +283,17 @@ if __name__ == '__main__':
                     db = gff.FeatureDB(db_file)
                     db.update(gff_file)
                 else:
-                    db = gff.create_db(gff_file, db_file, verbose=debug, pragmas=pragmas, force=False)
+                    db = gff.create_db(gff_file, db_file, merge_strategy=unique_keys, verbose=debug, pragmas=pragmas, force=False)
             else: # one db per GFF file
                 base_name = os.path.splitext(gff_file)[0]
                 db_file = base_name + normalize_filext(args['-e'])
                 try:
-                    db = gff.create_db(gff_file, db_file, verbose=debug, pragmas=pragmas, force=False)
+                    db = gff.create_db(gff_file, db_file, merge_strategy=unique_keys, verbose=debug, pragmas=pragmas, force=False)
                 except sql.OperationalError:
-                    raise IOError("Database file '%s' already exists." % db_file)
-                except sql.IntegrityError, e:
+                    raise IOError("Database file '{0}' already exists.".format(db_file))
+                except sql.IntegrityError, err:
                     remove_file(db_file)
-                    raise IOError("%s in database '%s'." % (e, db_file))
+                    raise IOError("{0} in database '{1}'.".format(err, db_file))
     else: # in rdf mode
         base_uri = validate_uri(args['-b'])
         download_url = validate_uri(args['-D'])
