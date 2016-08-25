@@ -1,16 +1,17 @@
 """
 SIGA.py is a command-line tool to generate Semantically Interoperable Genome Annotations from
-GFF files [1] according to the RDF specification [2].
+GFF files [1,2] according to the RDF specification [3].
 
 References:
 [1] Generic Feature Format specification, http://www.sequenceontology.org/
-[2] Resource Description Framework, https://www.w3.org/TR/rdf11-concepts/
+[2] DDBJ/ENA/GenBank Feature Table Definition, http://www.insdc.org/
+[3] Resource Description Framework, https://www.w3.org/TR/rdf11-concepts/
 
 Usage:
   SIGA.py -h|--help
   SIGA.py -v|--version
-  SIGA.py db [-cuV] [-d DB_FILE|-e DB_FILEXT] GFF_FILE...
-  SIGA.py rdf [-V] [-o FORMAT] -b BASE_URI -D URL -g NAME -t ID DB_FILE...
+  SIGA.py db [-ruV] [-d DB_FILE|-e DB_FILEXT] GFF_FILE...
+  SIGA.py rdf [-V] [-o FORMAT|-c URI] -b BASE_URI -s URL -g NAME -t ID DB_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF version 2 or 3.
@@ -21,12 +22,14 @@ Options:
   -v, --version
   -V, --verbose    Use for debugging.
   -b BASE_URI      Set the base URI (e.g. https://solgenomics.net/).
-  -D URL           Set the download URL of GFF file(s).
+  -c URI           Set the URI of person, organization or service making the RDF resource
+                   [default: http://orcid.org/0000-0003-1711-7961].
+  -s URL           Set the source/download URL of GFF file(s).
   -g NAME          Set the genome or species name (e.g. Solanum lycopersicum).
   -t ID            Set the NCBI Taxonomy ID of the species (e.g. 4081).
   -d DB_FILE       Create a database from GFF file(s).
   -e DB_FILEXT     Set the database file extension [default: .db].
-  -c               Check the referential integrity of the database(s).
+  -r               Check the referential integrity of the database(s).
   -u               Generate unique feature IDs if duplicates found.
   -o FORMAT        Select RDF output format:
                      turtle (.ttl) [default: turtle]
@@ -41,7 +44,7 @@ Options:
 #   three_prime_UTR, five_prime_UTR, polyA_site, polyA_sequence
 #
 # Defined URI data space relative to base URI:
-#   ../<feature type>/<feature ID> + [#<begin|end>|#<start>-<end>] only for chromosome
+#   ../genome/<species name>/<feature type>/<feature ID> + [#<begin|end>|#<start>-<end>] only for chromosome
 #
 
 from __future__ import print_function
@@ -57,7 +60,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.3.5'
+__version__ = '0.3.6'
 __status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
 
@@ -127,7 +130,20 @@ def get_feature_attr(feature, attr):
             return None
 
 
-def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
+def amend_feature_type(ft):
+    """Correct the original feature types into standard and/or more precise terms (feature keys)
+       according to the DDBJ/ENA/GenBank Feature Table Definition.
+    """
+    feature_types = dict(
+        mRNA = 'prim_transcript',
+        match = 'variation')
+    if ft in feature_types:
+        return feature_types[ft]
+    else:
+        return ft
+
+
+def triplify(db, rdf_format, base_uri, creator_uri, download_url, species_name, taxon_id):
     """Generate RDF triples from RDB using Direct Mapping approach."""
     fmt2fext = dict(xml = '.rdf',
                     nt = '.nt',
@@ -141,26 +157,31 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
     SO = Namespace('http://purl.obolibrary.org/obo/so.owl#') # FIXME: URI resolution of classes/properties
     FALDO = Namespace('http://biohackathon.org/resource/faldo#')
     TAXON = Namespace('http://purl.obolibrary.org/obo/ncbitaxon.owl#')
+    DCMITYPE = Namespace('http://purl.org/dc/dcmitype/')
     g = Graph()
     g.bind('so', SO)
     g.bind('faldo', FALDO)
     g.bind('taxon', TAXON)
-    g.bind('dct', DCTERMS)
+    g.bind('dcterms', DCTERMS)
+    g.bind('dcmitype', DCMITYPE)
 
     # map GFF feature types and DNA strandedness to ontology classes
     # Note: The 'mRNA' feature key is often used (incorrectly) in place of 'prim_transcript'
     # in genome annotations. The former feature MUST NOT contain introns while the latter
-    # MAY contain introns (see DDBJ/ENA/GenBank Feature Table Definition, http://www.insdc.org/)
-    # FT to SO mappings:
-    #   prim_transcript -> SO:0000120 refers to a protein-coding primary (unprocessed) transcript
+    # MAY contain introns [2].
+    # Feature type to SO mappings:
+    #   prim_transcript -> SO_0000120 refers to a protein-coding primary (unprocessed) transcript
     #   mRNA            -> SO_0000234 refers to a mature transcript
+    #
+    # Sometimes the 'match' feature type is used for polymorphic sites instead of known
+    # 'variation' key in [2].
     #
     feature_onto_class = {
         'genome'          : SO.SO_0001026,
         'chromosome'      : SO.SO_0000340,
         'gene'            : SO.SO_0000704,
         'prim_transcript' : SO.SO_0000120,
-        'mRNA'            : SO.SO_0000120, # N.B.
+        'mRNA'            : SO.SO_0000234,
         'CDS'             : SO.SO_0000316,
         'exon'            : SO.SO_0000147,
         'intron'          : SO.SO_0000188,
@@ -168,90 +189,97 @@ def triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id):
         'three_prime_UTR' : SO.SO_0000205,
         'polyA_site'      : SO.SO_0000553,
         'polyA_sequence'  : SO.SO_0000610,
+        'variation'       : SO.SO_0000694
+    }
+
+    strand_onto_class = {
         '+' : FALDO.ForwardStrandPosition,
         '-' : FALDO.ReverseStrandPosition,
         '?' : FALDO.StrandedPosition,
         '.' : FALDO.Position
     }
+
     gff.constants.always_return_list = False # return GFF attributes as string
 
     # add genome info to graph
-    genome = URIRef(os.path.join(base_uri, 'genome', species_name.replace(' ', '_')))
-    taxon = TAXON.term(str(taxon_id))
-
-    g.add( (genome, RDF.type, feature_onto_class['genome']) )
-    g.add( (genome, DCTERMS.created, Literal(datetime.now().strftime("%Y-%m-%d"), datatype=XSD.date )) )
-    for pred in (RDFS.label, DCTERMS.title):
-        g.add( (genome, pred, Literal('genome of {0}'.format(species_name), datatype=XSD.string)) )
-    g.add( (genome, DCTERMS.source, URIRef(download_url)) )
-    g.add( (genome, SO.genome_of, taxon) )
-    g.add( (taxon, RDFS.label, Literal('NCBI Taxonomy ID: {0}'.format(taxon_id), datatype=XSD.string)) )
-    g.add( (taxon, RDF.value, Literal(taxon_id, datatype=XSD.positiveInteger)) )
+    genome_uri = URIRef(os.path.join(base_uri, 'genome', species_name.replace(' ', '_')))
+    taxon_uri = TAXON.term(str(taxon_id))
+    g.add( (genome_uri, RDF.type, feature_onto_class['genome']) )
+    g.add( (genome_uri, RDF.type, DCMITYPE.Dataset) )
+    g.add( (genome_uri, RDFS.label, Literal('genome of {0}'.format(species_name), datatype=XSD.string)) )
+    g.add( (genome_uri, DCTERMS.created, Literal(datetime.now().strftime("%Y-%m-%d"), datatype=XSD.date )) )
+    g.add( (genome_uri, DCTERMS.creator, URIRef(creator_uri)) )
+    g.add( (genome_uri, DCTERMS.title, Literal('genome of {0}'.format(species_name), datatype=XSD.string)) )
+    g.add( (genome_uri, DCTERMS.source, URIRef(download_url)) )
+    g.add( (genome_uri, SO.genome_of, taxon_uri) )
+    g.add( (taxon_uri, RDFS.label, Literal('NCBI Taxonomy ID: {0}'.format(taxon_id), datatype=XSD.string)) )
+    g.add( (taxon_uri, RDF.value, Literal(taxon_id, datatype=XSD.positiveInteger)) )
 
     for feature in db.all_features():
-        if feature.strand not in feature_onto_class:
+        if feature.strand not in strand_onto_class:
             raise KeyError("Incorrect strand information for feature ID '{0}'.".format(feature.id))
         try: # skip GFF feature types not in feature_onto_class dict
-            strand = feature_onto_class[feature.strand]
+            strand_uri = strand_onto_class[feature.strand]
             feature_id = normalize_feature_id(feature.id)
-            feature_type = URIRef(feature_onto_class[feature.featuretype])
-            feature_parent = URIRef(os.path.join(base_uri, feature.featuretype, feature_id))
-            seqid = URIRef(os.path.join(base_uri, 'chromosome', str(feature.seqid)))
-            region = URIRef('{0}#{1}-{2}'.format(seqid, feature.start, feature.end))
-            start = URIRef('{0}#{1}'.format(seqid, feature.start))
-            end = URIRef('{0}#{1}'.format(seqid, feature.end))
-            label = '{0} {1}'.format(feature.featuretype.replace('_', ' '), feature_id)
+            feature_type = amend_feature_type(feature.featuretype)
+            feature_type_uri = URIRef(feature_onto_class[feature_type])
+            feature_uri = URIRef(os.path.join(genome_uri, feature_type, feature_id))
+            seqid_uri = URIRef(os.path.join(genome_uri, 'chromosome', str(feature.seqid)))
+            region_uri = URIRef('{0}#{1}-{2}'.format(seqid_uri, feature.start, feature.end))
+            start_uri = URIRef('{0}#{1}'.format(seqid_uri, feature.start))
+            end_uri = URIRef('{0}#{1}'.format(seqid_uri, feature.end))
+            label = '{0} {1}'.format(feature_type, feature_id)
 
             # add genome and chromosome info to graph
-            # Note: the assumption is that the `seqid` field refers to chromosome
-            g.add( (seqid, RDF.type, feature_onto_class['chromosome']) )
-            g.add( (seqid, RDFS.label, Literal('chromosome {0}'.format(feature.seqid), datatype=XSD.string)) )
-            g.add( (seqid, SO.part_of, genome) )
+            # Note: the assumption is that the seqid field refers to chromosome
+            g.add( (seqid_uri, RDF.type, feature_onto_class['chromosome']) )
+            g.add( (seqid_uri, RDFS.label, Literal('chromosome {0}'.format(feature.seqid), datatype=XSD.string)) )
+            g.add( (seqid_uri, SO.part_of, genome_uri) )
 
             # add feature types to graph
-            g.add( (feature_parent, RDF.type, feature_type) )
-            g.add( (feature_parent, RDFS.label, Literal(label, datatype=XSD.string)) )
+            g.add( (feature_uri, RDF.type, feature_type_uri) )
+            g.add( (feature_uri, RDFS.label, Literal(label, datatype=XSD.string)) )
 
-            # add feature description to graph
-            arr = []
-            for attr in ('Note', 'Name'):
-                el = get_feature_attr(feature, attr)
-                if el is not None:
-                    arr.append(str(el))
+            # add feature descriptions to graph
+            des = dict()
+            for key in ('Note', 'Name', 'Alias'):
+                val = get_feature_attr(feature, key)
+                if val is not None and val not in feature_id and val not in des:
+                    des[val] = None
 
-            if len(arr) != 0:
-                desc = unquote(' '.join(arr))
-                if desc != feature_id:
-                    g.add( (feature_parent, RDFS.comment, Literal(desc, datatype=XSD.string)) )
+            if len(des) != 0:
+                comment = unquote(' '.join(des.keys()))
+                g.add( (feature_uri, RDFS.comment, Literal(comment, datatype=XSD.string)) )
 
             # add feature start/end coordinates and strand info to graph
-            g.add( (feature_parent, FALDO.location, region) )
-            g.add( (region, RDF.type, FALDO.Region) )
-            g.add( (region, RDFS.label, Literal('region {0}-{1} on chromosome {2}'.format(feature.start,
+            g.add( (feature_uri, FALDO.location, region_uri) )
+            g.add( (region_uri, RDF.type, FALDO.Region) )
+            g.add( (region_uri, RDFS.label, Literal('region {0}-{1} on chromosome {2}'.format(feature.start,
                                                                                           feature.end,
                                                                                           feature.seqid))) )
-            g.add( (region, FALDO.begin, start) )
-            g.add( (start, RDF.type, FALDO.ExactPosition) )
-            g.add( (start, RDF.type, strand) )
-            g.add( (start, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.start, feature.seqid))) )
-            g.add( (start, FALDO.position, Literal(feature.start, datatype=XSD.positiveInteger)) )
-            g.add( (start, FALDO.reference, seqid) )
-            g.add( (region, FALDO.end, end) )
-            g.add( (end, RDF.type, FALDO.ExactPosition) )
-            g.add( (end, RDF.type, strand) )
-            g.add( (end, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.end, feature.seqid))) )
-            g.add( (end, FALDO.position, Literal(feature.end, datatype=XSD.positiveInteger)) )
-            g.add( (end, FALDO.reference, seqid) ) 
+            g.add( (region_uri, FALDO.begin, start_uri) )
+            g.add( (start_uri, RDF.type, FALDO.ExactPosition) )
+            g.add( (start_uri, RDF.type, strand_uri) )
+            g.add( (start_uri, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.start, feature.seqid))) )
+            g.add( (start_uri, FALDO.position, Literal(feature.start, datatype=XSD.positiveInteger)) )
+            g.add( (start_uri, FALDO.reference, seqid_uri) )
+            g.add( (region_uri, FALDO.end, end_uri) )
+            g.add( (end_uri, RDF.type, FALDO.ExactPosition) )
+            g.add( (end_uri, RDF.type, strand_uri) )
+            g.add( (end_uri, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.end, feature.seqid))) )
+            g.add( (end_uri, FALDO.position, Literal(feature.end, datatype=XSD.positiveInteger)) )
+            g.add( (end_uri, FALDO.reference, seqid_uri) )
             # TODO: phase info is mandatory for CDS feature types but can't find a corresponding ontology term
 
             # add parent-child relationships between features to graph
             for child in db.children(feature, level=1):
-                feature_id = normalize_feature_id(child.id)
-                feature_child = URIRef(os.path.join(base_uri, child.featuretype, feature_id))
-                g.add( (feature_parent, SO.has_part, feature_child) ) # use the inverse of part_of
+                child_feature_id = normalize_feature_id(child.id)
+                child_feature_type = amend_feature_type(child.featuretype)
+                child_feature_uri = URIRef(os.path.join(genome_uri, child_feature_type, child_feature_id))
+                g.add( (feature_uri, SO.has_part, child_feature_uri) ) # use the inverse of part_of
 
-                if feature.featuretype == 'gene' and child.featuretype in ('mRNA', 'prim_transcript'):
-                    g.add( (feature_parent, SO.transcribed_to, feature_child) )
+                if feature_type == 'gene' and child_feature_type == 'prim_transcript':
+                    g.add( (feature_uri, SO.transcribed_to, child_feature_uri) )
 
         except KeyError:
             pass
@@ -268,13 +296,12 @@ if __name__ == '__main__':
 
     if args['db'] is True: # in db mode
         unique_keys = 'create_unique' if args['-u'] is True else 'error'
-        fk_check = 'ON' if args['-c'] is True else 'OFF'
+        fk_check = 'ON' if args['-r'] is True else 'OFF'
         pragmas = dict(foreign_keys=fk_check)
 
         # populate database(s) from GFF file(s)
         for gff_file in args['GFF_FILE']:
             if os.path.exists(gff_file) is False:
-               remove_file(db_file)
                raise IOError("GFF file '{0}' not found.".format(gff_file))
 
             if args['-d']: # one db for all GFF files
@@ -296,7 +323,8 @@ if __name__ == '__main__':
                     raise IOError("{0} in database '{1}'.".format(err, db_file))
     else: # in rdf mode
         base_uri = validate_uri(args['-b'])
-        download_url = validate_uri(args['-D'])
+        download_url = validate_uri(args['-s'])
+        creator_uri = validate_uri(args['-c'])
         rdf_format = args['-o']
         species_name = args['-g']
         taxon_id = args['-t']
@@ -308,5 +336,5 @@ if __name__ == '__main__':
         # serialize RDF graphs from db files
         for db_file in args['DB_FILE']:
             db = gff.FeatureDB(db_file)
-            triplify(db, rdf_format, base_uri, download_url, species_name, taxon_id)
+            triplify(db, rdf_format, base_uri, creator_uri, download_url, species_name, taxon_id)
 
