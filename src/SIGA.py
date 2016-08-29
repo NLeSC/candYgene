@@ -49,7 +49,7 @@ Options:
 
 from __future__ import print_function
 from docopt import docopt
-from rdflib import Graph, URIRef, Literal, BNode
+from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import Namespace, RDF, RDFS, XSD, DCTERMS
 from urllib2 import urlparse, unquote
 from datetime import datetime
@@ -60,7 +60,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.3.6'
+__version__ = '0.3.7'
 __status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
 
@@ -92,7 +92,7 @@ def validate_uri(uri):
 def normalize_feature_id(id):
     """Ad-hoc function to normalize feature IDs."""
 
-    # Note: There is no optimal/universal solution to resolve all features in SGN (https://solgenomics.net/):
+    # Note: There is no optimal solution to resolve all features in SGN (https://solgenomics.net/):
     # e.g., a feature ID in a GFF file 'gene:Solyc00g005000.2' corresponds to three URLs:
     #   https://solgenomics.net/locus/Solyc00g005000.2/view !!! note the use of 'locus' instead of 'gene' !!!
     #   https://solgenomics.net/locus/Solyc00g005000/view
@@ -131,16 +131,16 @@ def get_feature_attr(feature, attr):
 
 
 def amend_feature_type(ft):
-    """Correct the original feature types into standard and/or more precise terms (feature keys)
+    """Modify the original feature types if deemed incorrect or imprecise; use standardized tems (feature keys)
        according to the DDBJ/ENA/GenBank Feature Table Definition.
     """
+    # TODO: add mappings to a config file
     feature_types = dict(
         mRNA = 'prim_transcript',
         match = 'variation')
     if ft in feature_types:
         return feature_types[ft]
-    else:
-        return ft
+    return ft
 
 
 def triplify(db, rdf_format, base_uri, creator_uri, download_url, species_name, taxon_id):
@@ -154,7 +154,8 @@ def triplify(db, rdf_format, base_uri, creator_uri, download_url, species_name, 
         raise IOError("Unsupported RDF serialization '{0}'.".format(rdf_format))
 
     # define additional namespace prefixes
-    SO = Namespace('http://purl.obolibrary.org/obo/so.owl#') # FIXME: URI resolution of classes/properties
+    # TODO: add namespaces to a config file
+    SO = Namespace('http://purl.obolibrary.org/obo/so.owl#')
     FALDO = Namespace('http://biohackathon.org/resource/faldo#')
     TAXON = Namespace('http://purl.obolibrary.org/obo/ncbitaxon.owl#')
     DCMITYPE = Namespace('http://purl.org/dc/dcmitype/')
@@ -241,14 +242,15 @@ def triplify(db, rdf_format, base_uri, creator_uri, download_url, species_name, 
             g.add( (feature_uri, RDFS.label, Literal(label, datatype=XSD.string)) )
 
             # add feature descriptions to graph
-            des = dict()
-            for key in ('Note', 'Name', 'Alias'):
+            des = []
+            for key in ('Note', 'Name', 'Alias', 'Ontology_term', 'Interpro2go_term'):
                 val = get_feature_attr(feature, key)
-                if val is not None and val not in feature_id and val not in des:
-                    des[val] = None
-
-            if len(des) != 0:
-                comment = unquote(' '.join(des.keys()))
+                if val is not None:
+                    val = str(val)
+                    if val not in feature_id and val not in ' '.join(des):
+                        des.append(val)
+            if des:
+                comment = unquote(' '.join(des))
                 g.add( (feature_uri, RDFS.comment, Literal(comment, datatype=XSD.string)) )
 
             # add feature start/end coordinates and strand info to graph
