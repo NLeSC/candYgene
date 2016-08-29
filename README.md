@@ -39,15 +39,19 @@ or download the latest genome annotations for tomato (ITAG v2.4) or potato (PGSC
 
 Generate RDF triples in Turtle format (default) from a GFF file in two steps.
 
-GFF to DB: `python SIGA.py db -cV ITAG2.4_gene_models.gff3`
+GFF to DB: `python SIGA.py db -rV ITAG2.4_gene_models.gff3`
 
 DB to RDF: 
-`python SIGA.py rdf
--b https://solgenomics.net/
--D ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3
--g "Solanum lycopersicum"
--t 4081
-ITAG2.4_gene_models.db`
+`python SIGA.py rdf \
+-b https://solgenomics.net/ \
+-c http://orcid.org/0000-0003-1711-7961 \
+-s ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3 \
+-n "Solanum lycopersicum" \
+-t 4081 ITAG2.4_gene_models.db`
+
+or with a _config.ini_ file
+
+`python SIGA.py rdf -C config.ini ITAG2.4_gene_models.db`
 
 Summary of I/O files:
 
