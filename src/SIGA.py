@@ -10,8 +10,8 @@ References:
 Usage:
   SIGA.py -h|--help
   SIGA.py -v|--version
-  SIGA.py db [-ruV] [-d DB_FILE|-e DB_FILEXT] GFF_FILE...
-  SIGA.py rdf [-V] [-o FORMAT|-c URI] -b BASE_URI -s URL -g NAME -t ID DB_FILE...
+  SIGA.py db [-ruV] [-d DB_FILE | -e DB_FILEXT] GFF_FILE...
+  SIGA.py rdf [-V] [-o FORMAT] (-C CFG_FILE | -b URI -c URI -s URL -n NAME -t ID) DB_FILE...
 
 Arguments:
   GFF_FILE...      Input file(s) in GFF version 2 or 3.
@@ -20,18 +20,19 @@ Arguments:
 Options:
   -h, --help
   -v, --version
-  -V, --verbose    Use for debugging.
-  -b BASE_URI      Set the base URI (e.g. https://solgenomics.net/).
-  -c URI           Set the URI of person, organization or service making the RDF resource
-                   [default: http://orcid.org/0000-0003-1711-7961].
-  -s URL           Set the source/download URL of GFF file(s).
-  -g NAME          Set the genome or species name (e.g. Solanum lycopersicum).
+  -V, --verbose    Show verbose output (debug mode).
+  -b URI           Set the base URI of the generated RDF graph (e.g. https://solgenomics.net/).
+  -c URI           Set the URI of a person, organization or service making the resource
+                   available in RDF (e.g. http://orcid.org/0000-0003-1711-7961).
+  -C FILE          Set the config file path.
+  -s URL           Set the source or download URL of GFF file(s).
+  -n NAME          Set the genome or species name (e.g. Solanum lycopersicum).
   -t ID            Set the NCBI Taxonomy ID of the species (e.g. 4081).
-  -d DB_FILE       Create a database from GFF file(s).
+  -d DB_FILE       Create features database from GFF file(s).
   -e DB_FILEXT     Set the database file extension [default: .db].
   -r               Check the referential integrity of the database(s).
   -u               Generate unique feature IDs if duplicates found.
-  -o FORMAT        Select RDF output format:
+  -o FORMAT        Set the format of the generated RDF graph:
                      turtle (.ttl) [default: turtle]
                      xml (.rdf),
                      nt (.nt),
@@ -53,6 +54,7 @@ from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import Namespace, RDF, RDFS, XSD, DCTERMS
 from urllib2 import urlparse, unquote
 from datetime import datetime
+from ConfigParser import SafeConfigParser
 
 import os
 import re
@@ -60,9 +62,37 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.3.7'
+__version__ = '0.3.8'
 __status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
+
+
+def init_config():
+    """Initialize config dictionary with mandatory sections and attributes (keys)."""
+    config = dict(URIs = dict(rdf_base = None,
+                              rdf_creator = None,
+                              gff_source = None),
+                  Dataset = dict(species_name = None,
+                            ncbi_taxon_id = None ))
+    return config
+
+
+def read_config_file(fname):
+    """Read config file and return dataset-related setting."""
+    parser = SafeConfigParser()
+    parser.read(fname)
+
+    if os.path.isfile(fname) is False:
+        raise IOError("Config file '{0}' not found.".format(fname))
+
+    for section in parser.sections():
+        if section not in config.keys():
+            raise ValueError("Unsupported section '{0}' in the config file '{1}.".format(section, fname))
+        for attr,val in parser.items(section):
+            if attr not in config[section].keys():
+                raise ValueError("Unsupported attribute '{0}' in config file '{1}'.".format(attr, section, fname))
+            config[section][attr] = val
+    return config
 
 
 def normalize_filext(s):
@@ -143,7 +173,7 @@ def amend_feature_type(ft):
     return ft
 
 
-def triplify(db, rdf_format, base_uri, creator_uri, download_url, species_name, taxon_id):
+def triplify(db, rdf_format, config):
     """Generate RDF triples from RDB using Direct Mapping approach."""
     fmt2fext = dict(xml = '.rdf',
                     nt = '.nt',
@@ -152,6 +182,12 @@ def triplify(db, rdf_format, base_uri, creator_uri, download_url, species_name, 
 
     if rdf_format not in fmt2fext:
         raise IOError("Unsupported RDF serialization '{0}'.".format(rdf_format))
+
+    base_uri = config['URIs']['rdf_base']
+    creator_uri = config['URIs']['rdf_creator']
+    download_url = config['URIs']['gff_source']
+    species_name = config['Dataset']['species_name']
+    taxon_id = config['Dataset']['ncbi_taxon_id']
 
     # define additional namespace prefixes
     # TODO: add namespaces to a config file
@@ -257,18 +293,20 @@ def triplify(db, rdf_format, base_uri, creator_uri, download_url, species_name, 
             g.add( (feature_uri, FALDO.location, region_uri) )
             g.add( (region_uri, RDF.type, FALDO.Region) )
             g.add( (region_uri, RDFS.label, Literal('region {0}-{1} on chromosome {2}'.format(feature.start,
-                                                                                          feature.end,
-                                                                                          feature.seqid))) )
+                                                                                              feature.end,
+                                                                                              feature.seqid))) )
             g.add( (region_uri, FALDO.begin, start_uri) )
             g.add( (start_uri, RDF.type, FALDO.ExactPosition) )
             g.add( (start_uri, RDF.type, strand_uri) )
-            g.add( (start_uri, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.start, feature.seqid))) )
+            g.add( (start_uri, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.start,
+                                                                                              feature.seqid))) )
             g.add( (start_uri, FALDO.position, Literal(feature.start, datatype=XSD.positiveInteger)) )
             g.add( (start_uri, FALDO.reference, seqid_uri) )
             g.add( (region_uri, FALDO.end, end_uri) )
             g.add( (end_uri, RDF.type, FALDO.ExactPosition) )
             g.add( (end_uri, RDF.type, strand_uri) )
-            g.add( (end_uri, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.end, feature.seqid))) )
+            g.add( (end_uri, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.end,
+                                                                                            feature.seqid))) )
             g.add( (end_uri, FALDO.position, Literal(feature.end, datatype=XSD.positiveInteger)) )
             g.add( (end_uri, FALDO.reference, seqid_uri) )
             # TODO: phase info is mandatory for CDS feature types but can't find a corresponding ontology term
@@ -293,7 +331,6 @@ def triplify(db, rdf_format, base_uri, creator_uri, download_url, species_name, 
 
 if __name__ == '__main__':
     args = docopt(__doc__, version=__version__)
-    #print(args)
     debug = args['--verbose']
 
     if args['db'] is True: # in db mode
@@ -324,19 +361,27 @@ if __name__ == '__main__':
                     remove_file(db_file)
                     raise IOError("{0} in database '{1}'.".format(err, db_file))
     else: # in rdf mode
-        base_uri = validate_uri(args['-b'])
-        download_url = validate_uri(args['-s'])
-        creator_uri = validate_uri(args['-c'])
         rdf_format = args['-o']
-        species_name = args['-g']
-        taxon_id = args['-t']
+        cfg_file = args['-C']
+        config = init_config()
+
+        if cfg_file is None:
+	    config['URIs']['rdf_base'] = validate_uri(args['-b'])
+            config['URIs']['rdf_creator'] = validate_uri(args['-c'])
+            config['URIs']['gff_source'] = validate_uri(args['-s'])
+            config['Dataset']['species_name'] = args['-n']
+            config['Dataset']['ncbi_taxon_id'] = args['-t']
+        else:
+            config = read_config_file(cfg_file)
+
         try:
-            taxon_id = int(taxon_id)
+            taxon_id = config['Dataset']['ncbi_taxon_id']
+            config['Dataset']['ncbi_taxon_id'] = int(taxon_id)
         except:
             raise ValueError('Enter valid NCBI Taxonomy ID.')
 
         # serialize RDF graphs from db files
         for db_file in args['DB_FILE']:
             db = gff.FeatureDB(db_file)
-            triplify(db, rdf_format, base_uri, creator_uri, download_url, species_name, taxon_id)
+            triplify(db, rdf_format, config)
 
