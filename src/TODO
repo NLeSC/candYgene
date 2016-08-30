@@ -2,6 +2,7 @@ This is a random list of potential improvements:
 - support more feature types: proteins, protein domains/motifs, markers, QTLs etc.
 - add GFF phase info to CDS (mandatory) but can't find a corresponding ontology term
 - add GFF source info (SO does not have relevant property for this)
+- add some description of the data resource 
 - link the chromosomal regions to genome browser tracks
 - support named RDF graphs (JSON-LD, TriG, N-Quads)
 - provide external links to primary and derived molecular databases (e.g. ENA, UniProt, Ensembl, InterPro, GO, OMA, NCBI's GenBank, Refseq and Gene)
