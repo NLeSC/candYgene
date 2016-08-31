@@ -62,7 +62,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.3.8'
+__version__ = '0.3.9'
 __status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
 
@@ -73,7 +73,7 @@ def init_config():
                               rdf_creator = None,
                               gff_source = None),
                   Dataset = dict(species_name = None,
-                            ncbi_taxon_id = None ))
+                                 ncbi_taxon_id = None))
     return config
 
 
@@ -149,15 +149,25 @@ def normalize_feature_id(id):
     return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', id)
 
 
-def get_feature_attr(feature, attr):
-    """Get feature attribute."""
-    try:
-        return feature[attr]
-    except KeyError:
-        try:
-            return feature[attr.lower()]
-        except KeyError:
-            return None
+def get_feature_attrs(ft):
+    """Get feature attributes and concatenate the the values into a single string."""
+    attrs = {} # selected attributes
+    des = []
+
+    for attr in ['Name', 'Note', 'Alias', 'Ontology_term', 'Interpro2go_term', 'Sifter_term']:
+        attrs[attr] = None
+        attrs[attr.lower()] = None
+
+    for key in ft.attributes.keys():
+        if key in attrs:
+            val = ft[key]
+            val = ', '.join(val) if type(val) == list else str(val)
+            des.append('{0}: {1}'.format(key, val))
+
+    if len(des) == 0:
+        return None
+    else:
+        return unquote('; '.join(sorted(des)))
 
 
 def amend_feature_type(ft):
@@ -236,8 +246,6 @@ def triplify(db, rdf_format, config):
         '.' : FALDO.Position
     }
 
-    gff.constants.always_return_list = False # return GFF attributes as string
-
     # add genome info to graph
     genome_uri = URIRef(os.path.join(base_uri, 'genome', species_name.replace(' ', '_')))
     taxon_uri = TAXON.term(str(taxon_id))
@@ -277,17 +285,10 @@ def triplify(db, rdf_format, config):
             g.add( (feature_uri, RDF.type, feature_type_uri) )
             g.add( (feature_uri, RDFS.label, Literal(label, datatype=XSD.string)) )
 
-            # add feature descriptions to graph
-            des = []
-            for key in ('Note', 'Name', 'Alias', 'Ontology_term', 'Interpro2go_term'):
-                val = get_feature_attr(feature, key)
-                if val is not None:
-                    val = str(val)
-                    if val not in feature_id and val not in ' '.join(des):
-                        des.append(val)
-            if des:
-                comment = unquote(' '.join(des))
-                g.add( (feature_uri, RDFS.comment, Literal(comment, datatype=XSD.string)) )
+            # add feature descriptions (from the attributes field) to graph
+            des = get_feature_attrs(feature)
+            if des is not None:
+                g.add( (feature_uri, RDFS.comment, Literal(des, datatype=XSD.string)) )
 
             # add feature start/end coordinates and strand info to graph
             g.add( (feature_uri, FALDO.location, region_uri) )
