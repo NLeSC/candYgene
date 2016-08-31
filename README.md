@@ -85,6 +85,9 @@ List registered data file(s):
 Bulk data loading:
 `rdf_loader_run();`
 
+Re-index for full-text search:
+`DB.DBA.VT_INC_INDEX_DB_DBA_RDF_OBJ()`
+
 Note: For loading a single data file one could use the following command:
 
 `SPARQL LOAD "file:///mydatadir/features.ttl" INTO "https://solgenomics.net#";`
