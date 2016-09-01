@@ -41,13 +41,15 @@ Generate RDF triples in Turtle format (default) from a GFF file in two steps.
 
 GFF to DB: `python SIGA.py db -rV ITAG2.4_gene_models.gff3`
 
-DB to RDF: 
-`python SIGA.py rdf \
+DB to RDF:
+<pre><code>
+python SIGA.py rdf \
 -b https://solgenomics.net/ \
 -c http://orcid.org/0000-0003-1711-7961 \
 -s ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3 \
 -n "Solanum lycopersicum" \
--t 4081 ITAG2.4_gene_models.db`
+-t 4081 ITAG2.4_gene_models.db
+</code></pre>
 
 or with a _config.ini_ file
 
@@ -85,7 +87,7 @@ List registered data file(s):
 Bulk data loading:
 `rdf_loader_run();`
 
-Re-index for full-text search:
+Re-index triples for full-text search:
 `DB.DBA.VT_INC_INDEX_DB_DBA_RDF_OBJ();`
 
 Note: For loading a single data file one could use the following command:
