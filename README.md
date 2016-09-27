@@ -73,7 +73,7 @@ Connect to db server:
 `isql 1111 dba`
 
 Delete (old) RDF graph if necessary:
-`SPARQL CLEAR GRAPH "https://solgenomics.net#"`
+`SPARQL CLEAR GRAPH <https://solgenomics.net#>;`
 
 Delete any previously registered data files:
 `DELETE FROM DB.DBA.load_list;`
