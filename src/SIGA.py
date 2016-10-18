@@ -47,6 +47,14 @@ Options:
 # Defined URI data space relative to base URI:
 #   ../genome/<species name>/<feature type>/<feature ID> + [#<begin|end>|#<start>-<end>] only for chromosome
 #
+# FIXME: Sequence Ontology (SO) properties:
+#   SO_genome_of
+#   SO_part_of
+#   SO_has_part
+#   SO_transcribed_to
+#   SO_translated_to
+# do not resolve via http://purl.obolibrary.org/obo/.
+#
 
 from __future__ import print_function
 from docopt import docopt
@@ -201,14 +209,13 @@ def triplify(db, rdf_format, config):
 
     # define additional namespace prefixes
     # TODO: add namespaces to a config file
-    SO = Namespace('http://purl.obolibrary.org/obo/so.owl#')
+    OBO = Namespace('http://purl.obolibrary.org/obo/')
     FALDO = Namespace('http://biohackathon.org/resource/faldo#')
-    TAXON = Namespace('http://purl.obolibrary.org/obo/ncbitaxon.owl#')
     DCMITYPE = Namespace('http://purl.org/dc/dcmitype/')
+
     g = Graph()
-    g.bind('so', SO)
+    g.bind('obo', OBO)
     g.bind('faldo', FALDO)
-    g.bind('taxon', TAXON)
     g.bind('dcterms', DCTERMS)
     g.bind('dcmitype', DCMITYPE)
 
@@ -224,19 +231,19 @@ def triplify(db, rdf_format, config):
     # 'variation' key in [2].
     #
     feature_onto_class = {
-        'genome'          : SO.SO_0001026,
-        'chromosome'      : SO.SO_0000340,
-        'gene'            : SO.SO_0000704,
-        'prim_transcript' : SO.SO_0000120,
-        'mRNA'            : SO.SO_0000234,
-        'CDS'             : SO.SO_0000316,
-        'exon'            : SO.SO_0000147,
-        'intron'          : SO.SO_0000188,
-        'five_prime_UTR'  : SO.SO_0000204,
-        'three_prime_UTR' : SO.SO_0000205,
-        'polyA_site'      : SO.SO_0000553,
-        'polyA_sequence'  : SO.SO_0000610,
-        'variation'       : SO.SO_0000694
+        'genome'          : OBO.SO_0001026,
+        'chromosome'      : OBO.SO_0000340,
+        'gene'            : OBO.SO_0000704,
+        'prim_transcript' : OBO.SO_0000120,
+        'mRNA'            : OBO.SO_0000234,
+        'CDS'             : OBO.SO_0000316,
+        'exon'            : OBO.SO_0000147,
+        'intron'          : OBO.SO_0000188,
+        'five_prime_UTR'  : OBO.SO_0000204,
+        'three_prime_UTR' : OBO.SO_0000205,
+        'polyA_site'      : OBO.SO_0000553,
+        'polyA_sequence'  : OBO.SO_0000610,
+        'variation'       : OBO.SO_0000694
     }
 
     strand_onto_class = {
@@ -248,7 +255,7 @@ def triplify(db, rdf_format, config):
 
     # add genome info to graph
     genome_uri = URIRef(os.path.join(base_uri, 'genome', species_name.replace(' ', '_')))
-    taxon_uri = TAXON.term(str(taxon_id))
+    taxon_uri = OBO.term('NCBITaxon_%d' % taxon_id)
     g.add( (genome_uri, RDF.type, feature_onto_class['genome']) )
     g.add( (genome_uri, RDF.type, DCMITYPE.Dataset) )
     g.add( (genome_uri, RDFS.label, Literal('genome of {0}'.format(species_name), datatype=XSD.string)) )
@@ -256,9 +263,9 @@ def triplify(db, rdf_format, config):
     g.add( (genome_uri, DCTERMS.creator, URIRef(creator_uri)) )
     g.add( (genome_uri, DCTERMS.title, Literal('genome of {0}'.format(species_name), datatype=XSD.string)) )
     g.add( (genome_uri, DCTERMS.source, URIRef(download_url)) )
-    g.add( (genome_uri, SO.genome_of, taxon_uri) )
+    g.add( (genome_uri, OBO.SO_genome_of, taxon_uri) )
     g.add( (taxon_uri, RDFS.label, Literal('NCBI Taxonomy ID: {0}'.format(taxon_id), datatype=XSD.string)) )
-    g.add( (taxon_uri, RDF.value, Literal(taxon_id, datatype=XSD.positiveInteger)) )
+    g.add( (taxon_uri, DCTERMS.identifier, Literal(taxon_id, datatype=XSD.positiveInteger)) )
 
     for feature in db.all_features():
         if feature.strand not in strand_onto_class:
@@ -279,11 +286,12 @@ def triplify(db, rdf_format, config):
             # Note: the assumption is that the seqid field refers to chromosome
             g.add( (seqid_uri, RDF.type, feature_onto_class['chromosome']) )
             g.add( (seqid_uri, RDFS.label, Literal('chromosome {0}'.format(feature.seqid), datatype=XSD.string)) )
-            g.add( (seqid_uri, SO.part_of, genome_uri) )
+            g.add( (seqid_uri, OBO.SO_part_of, genome_uri) )
 
-            # add feature types to graph
+            # add feature types and IDs to graph
             g.add( (feature_uri, RDF.type, feature_type_uri) )
             g.add( (feature_uri, RDFS.label, Literal(label, datatype=XSD.string)) )
+            g.add( (feature_uri, DCTERMS.identifier, Literal(feature_id, datatype=XSD.string)) )
 
             # add feature descriptions (from the attributes field) to graph
             des = get_feature_attrs(feature)
@@ -317,10 +325,10 @@ def triplify(db, rdf_format, config):
                 child_feature_id = normalize_feature_id(child.id)
                 child_feature_type = amend_feature_type(child.featuretype)
                 child_feature_uri = URIRef(os.path.join(genome_uri, child_feature_type, child_feature_id))
-                g.add( (feature_uri, SO.has_part, child_feature_uri) ) # use the inverse of part_of
+                g.add( (feature_uri, OBO.SO_has_part, child_feature_uri) ) # use the inverse of part_of
 
                 if feature_type == 'gene' and child_feature_type == 'prim_transcript':
-                    g.add( (feature_uri, SO.transcribed_to, child_feature_uri) )
+                    g.add( (feature_uri, OBO.SO_transcribed_to, child_feature_uri) )
 
         except KeyError:
             pass
