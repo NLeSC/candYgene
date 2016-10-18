@@ -185,7 +185,8 @@ def amend_feature_type(ft):
     # TODO: add mappings to a config file
     feature_types = dict(
         mRNA = 'prim_transcript',
-        match = 'variation')
+        match = 'variation',
+        match_part = 'variation')
     if ft in feature_types:
         return feature_types[ft]
     return ft
@@ -243,7 +244,7 @@ def triplify(db, rdf_format, config):
         'three_prime_UTR' : OBO.SO_0000205,
         'polyA_site'      : OBO.SO_0000553,
         'polyA_sequence'  : OBO.SO_0000610,
-        'variation'       : OBO.SO_0000694
+        'variation'       : OBO.SO_0001645
     }
 
     strand_onto_class = {
