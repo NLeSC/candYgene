@@ -170,7 +170,7 @@ def get_feature_attrs(ft):
         if key in attrs:
             val = ft[key]
             val = ', '.join(val) if type(val) == list else str(val)
-            des.append('{0}: {1}'.format(key, val))
+            des.append('{0}: {1}'.format(key, val.encode('utf-8')))
 
     if len(des) == 0:
         return None
@@ -179,10 +179,12 @@ def get_feature_attrs(ft):
 
 
 def amend_feature_type(ft):
-    """Modify the original feature types if deemed incorrect or imprecise; use standardized tems (feature keys)
+    """Change the original feature type to correct or more specific type
        according to the DDBJ/ENA/GenBank Feature Table Definition.
     """
     # TODO: add mappings to a config file
+    # 'match' or 'match_part' features are sometimes (mis)used to indicate polymorphic sites
+    # instead of using the 'variation' key according to [2].
     feature_types = dict(
         mRNA = 'prim_transcript',
         match = 'variation',
@@ -228,9 +230,6 @@ def triplify(db, rdf_format, config):
     #   prim_transcript -> SO_0000120 refers to a protein-coding primary (unprocessed) transcript
     #   mRNA            -> SO_0000234 refers to a mature transcript
     #
-    # Sometimes the 'match' feature type is used for polymorphic sites instead of known
-    # 'variation' key in [2].
-    #
     feature_onto_class = {
         'genome'          : OBO.SO_0001026,
         'chromosome'      : OBO.SO_0000340,
@@ -264,7 +263,8 @@ def triplify(db, rdf_format, config):
     g.add( (genome_uri, DCTERMS.creator, URIRef(creator_uri)) )
     g.add( (genome_uri, DCTERMS.title, Literal('genome of {0}'.format(species_name), datatype=XSD.string)) )
     g.add( (genome_uri, DCTERMS.source, URIRef(download_url)) )
-    g.add( (genome_uri, OBO.SO_genome_of, taxon_uri) )
+    g.add( (genome_uri, OBO.SO_genome_of, taxon_uri) ) # N.B.: predicate has no domain/range defined
+    g.add( (genome_uri, OBO.RO_0002162, taxon_uri) )   # use 'in taxon' alternatively
     g.add( (taxon_uri, RDFS.label, Literal('NCBI Taxonomy ID: {0}'.format(taxon_id), datatype=XSD.string)) )
     g.add( (taxon_uri, DCTERMS.identifier, Literal(taxon_id, datatype=XSD.positiveInteger)) )
 
