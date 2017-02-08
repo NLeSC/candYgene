@@ -233,7 +233,7 @@ def triplify(db, rdf_format, config):
     feature_onto_class = {
         'genome'          : OBO.SO_0001026,
         'chromosome'      : OBO.SO_0000340,
-        'gene'            : OBO.SO_0000704,
+        'gene'            : OBO.SO_0001217,
         'prim_transcript' : OBO.SO_0000120,
         'mRNA'            : OBO.SO_0000234,
         'CDS'             : OBO.SO_0000316,
