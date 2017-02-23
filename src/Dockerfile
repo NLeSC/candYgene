@@ -18,11 +18,14 @@ RUN apt-get update && apt-get install -y \
     bison \
     libssl-dev \
     net-tools \
+    vim \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # set command-line args including defaults
 ARG VOS_VERSION=stable/7
 ARG VOS_PREFIX=/usr/local/virtuoso-opensource
+ARG VOS_MAXROWS=100000
 
 # compile & install Virtuoso including serveral VAD packages
 WORKDIR /tmp
@@ -45,9 +48,10 @@ ENV PATH=${VOS_PREFIX}/bin:${PATH}
 ENV VOS_SHARE=/tmp/share
 VOLUME ${VOS_SHARE}
 
-# append volume to DirsAllowed in Virtuoso config file
+# append volume to DirsAllowed and/or set ResultSetMaxRows in Virtuoso config file
 ENV VOS_CONFIG=${VOS_PREFIX}/var/lib/virtuoso/db/virtuoso.ini
 RUN sed -i "/DirsAllowed/ s:$:,${VOS_SHARE}:" ${VOS_CONFIG}
+RUN sed -i "/ResultSetMaxRows/ s:[0-9]*$:${VOS_MAXROWS}:" ${VOS_CONFIG}
 WORKDIR ${VOS_SHARE}
 
 # expose (default) Virtuoso server ports
