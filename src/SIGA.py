@@ -302,21 +302,17 @@ def triplify(db, rdf_format, config):
             # add feature start/end coordinates and strand info to graph
             g.add( (feature_uri, FALDO.location, region_uri) )
             g.add( (region_uri, RDF.type, FALDO.Region) )
-            g.add( (region_uri, RDFS.label, Literal('region {0}-{1} on chromosome {2}'.format(feature.start,
-                                                                                              feature.end,
-                                                                                              feature.seqid))) )
+            g.add( (region_uri, RDFS.label, Literal('chromosome {0}:{1}-{2}'.format(feature.seqid, feature.start, feature.end))) )
             g.add( (region_uri, FALDO.begin, start_uri) )
             g.add( (start_uri, RDF.type, FALDO.ExactPosition) )
             g.add( (start_uri, RDF.type, strand_uri) )
-            g.add( (start_uri, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.start,
-                                                                                              feature.seqid))) )
+            g.add( (start_uri, RDFS.label, Literal('chromosome {0}:{1}-*'.format(feature.seqid, feature.start))) )
             g.add( (start_uri, FALDO.position, Literal(feature.start, datatype=XSD.positiveInteger)) )
             g.add( (start_uri, FALDO.reference, seqid_uri) )
             g.add( (region_uri, FALDO.end, end_uri) )
             g.add( (end_uri, RDF.type, FALDO.ExactPosition) )
             g.add( (end_uri, RDF.type, strand_uri) )
-            g.add( (end_uri, RDFS.label, Literal('position at {0} on chromosome {1}'.format(feature.end,
-                                                                                            feature.seqid))) )
+            g.add( (end_uri, RDFS.label, Literal('chromosome {0}:*-{1}'.format(feature.seqid, feature.end))) )
             g.add( (end_uri, FALDO.position, Literal(feature.end, datatype=XSD.positiveInteger)) )
             g.add( (end_uri, FALDO.reference, seqid_uri) )
             # TODO: phase info is mandatory for CDS feature types but can't find a corresponding ontology term
