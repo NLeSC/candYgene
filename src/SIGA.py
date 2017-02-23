@@ -4,7 +4,7 @@ GFF files [1,2] according to the RDF specification [3].
 
 References:
 [1] Generic Feature Format specification, http://www.sequenceontology.org/
-[2] DDBJ/ENA/GenBank Feature Table Definition, http://www.insdc.org/
+[2] DDBJ/ENA/GenBank Feature Table Definition, http://www.insdc.org/documents/feature-table
 [3] Resource Description Framework, https://www.w3.org/TR/rdf11-concepts/
 
 Usage:
@@ -47,14 +47,6 @@ Options:
 # Defined URI data space relative to base URI:
 #   ../genome/<species name>/<feature type>/<feature ID> + [#<begin|end>|#<start>-<end>] only for chromosome
 #
-# FIXME: Sequence Ontology (SO) properties:
-#   SO_genome_of
-#   SO_part_of
-#   SO_has_part
-#   SO_transcribed_to
-#   SO_translated_to
-# do not resolve via http://purl.obolibrary.org/obo/.
-#
 
 from __future__ import print_function
 from docopt import docopt
@@ -70,7 +62,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.3.9'
+__version__ = '0.4.0'
 __status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
 
@@ -154,7 +146,7 @@ def normalize_feature_id(id):
     # for the UTRs, which would have ambiguous feature IDs, e.g., Solyc00g005000.2.1.0 for both
     # 'five_prime_UTR:Solyc00g005000.2.1.0' and 'three_prime_UTR:Solyc00g005000.2.1.0'
     #
-    return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', id)
+    return re.sub('gene:|mRNA:|CDS:|exon:|intron:|\w+UTR:', '', id, flags=re.IGNORECASE)
 
 
 def get_feature_attrs(ft):
@@ -215,12 +207,14 @@ def triplify(db, rdf_format, config):
     OBO = Namespace('http://purl.obolibrary.org/obo/')
     FALDO = Namespace('http://biohackathon.org/resource/faldo#')
     DCMITYPE = Namespace('http://purl.org/dc/dcmitype/')
+    SO = Namespace('http://purl.obolibrary.org/obo/so#')
 
     g = Graph()
     g.bind('obo', OBO)
     g.bind('faldo', FALDO)
     g.bind('dcterms', DCTERMS)
     g.bind('dcmitype', DCMITYPE)
+    g.bind('so', SO)
 
     # map GFF feature types and DNA strandedness to ontology classes
     # Note: The 'mRNA' feature key is often used (incorrectly) in place of 'prim_transcript'
@@ -256,6 +250,7 @@ def triplify(db, rdf_format, config):
     # add genome info to graph
     genome_uri = URIRef(os.path.join(base_uri, 'genome', species_name.replace(' ', '_')))
     taxon_uri = OBO.term('NCBITaxon_%d' % taxon_id)
+
     g.add( (genome_uri, RDF.type, feature_onto_class['genome']) )
     g.add( (genome_uri, RDF.type, DCMITYPE.Dataset) )
     g.add( (genome_uri, RDFS.label, Literal('genome of {0}'.format(species_name), datatype=XSD.string)) )
@@ -263,7 +258,7 @@ def triplify(db, rdf_format, config):
     g.add( (genome_uri, DCTERMS.creator, URIRef(creator_uri)) )
     g.add( (genome_uri, DCTERMS.title, Literal('genome of {0}'.format(species_name), datatype=XSD.string)) )
     g.add( (genome_uri, DCTERMS.source, URIRef(download_url)) )
-    g.add( (genome_uri, OBO.SO_genome_of, taxon_uri) ) # N.B.: predicate has no domain/range defined
+    g.add( (genome_uri, SO.genome_of, taxon_uri) ) # N.B.: predicate has no domain/range defined
     g.add( (genome_uri, OBO.RO_0002162, taxon_uri) )   # use 'in taxon' alternatively
     g.add( (taxon_uri, RDFS.label, Literal('NCBI Taxonomy ID: {0}'.format(taxon_id), datatype=XSD.string)) )
     g.add( (taxon_uri, DCTERMS.identifier, Literal(taxon_id, datatype=XSD.positiveInteger)) )
@@ -272,26 +267,26 @@ def triplify(db, rdf_format, config):
         if feature.strand not in strand_onto_class:
             raise KeyError("Incorrect strand information for feature ID '{0}'.".format(feature.id))
         try: # skip GFF feature types not in feature_onto_class dict
+            chrom = str(feature.seqid)
             strand_uri = strand_onto_class[feature.strand]
             feature_id = normalize_feature_id(feature.id)
             feature_type = amend_feature_type(feature.featuretype)
             feature_type_uri = URIRef(feature_onto_class[feature_type])
             feature_uri = URIRef(os.path.join(genome_uri, feature_type, feature_id))
-            seqid_uri = URIRef(os.path.join(genome_uri, 'chromosome', str(feature.seqid)))
+            seqid_uri = URIRef(os.path.join(genome_uri, 'chromosome', chrom))
             region_uri = URIRef('{0}#{1}-{2}'.format(seqid_uri, feature.start, feature.end))
             start_uri = URIRef('{0}#{1}'.format(seqid_uri, feature.start))
             end_uri = URIRef('{0}#{1}'.format(seqid_uri, feature.end))
-            label = '{0} {1}'.format(feature_type, feature_id)
 
             # add genome and chromosome info to graph
             # Note: the assumption is that the seqid field refers to chromosome
             g.add( (seqid_uri, RDF.type, feature_onto_class['chromosome']) )
-            g.add( (seqid_uri, RDFS.label, Literal('chromosome {0}'.format(feature.seqid), datatype=XSD.string)) )
-            g.add( (seqid_uri, OBO.SO_part_of, genome_uri) )
+            g.add( (seqid_uri, RDFS.label, Literal('chromosome {0}'.format(chrom), datatype=XSD.string)) )
+            g.add( (seqid_uri, SO.part_of, genome_uri) )
 
             # add feature types and IDs to graph
             g.add( (feature_uri, RDF.type, feature_type_uri) )
-            g.add( (feature_uri, RDFS.label, Literal(label, datatype=XSD.string)) )
+            g.add( (feature_uri, RDFS.label, Literal('{0} {1}'.format(feature_type, feature_id), datatype=XSD.string)) )
             g.add( (feature_uri, DCTERMS.identifier, Literal(feature_id, datatype=XSD.string)) )
 
             # add feature descriptions (from the attributes field) to graph
@@ -302,30 +297,30 @@ def triplify(db, rdf_format, config):
             # add feature start/end coordinates and strand info to graph
             g.add( (feature_uri, FALDO.location, region_uri) )
             g.add( (region_uri, RDF.type, FALDO.Region) )
-            g.add( (region_uri, RDFS.label, Literal('chromosome {0}:{1}-{2}'.format(feature.seqid, feature.start, feature.end))) )
+            g.add( (region_uri, RDFS.label, Literal('chromosome {0}:{1}-{2}'.format(chrom, feature.start, feature.end))) )
             g.add( (region_uri, FALDO.begin, start_uri) )
             g.add( (start_uri, RDF.type, FALDO.ExactPosition) )
             g.add( (start_uri, RDF.type, strand_uri) )
-            g.add( (start_uri, RDFS.label, Literal('chromosome {0}:{1}-*'.format(feature.seqid, feature.start))) )
+            g.add( (start_uri, RDFS.label, Literal('chromosome {0}:{1}-*'.format(chrom, feature.start))) )
             g.add( (start_uri, FALDO.position, Literal(feature.start, datatype=XSD.positiveInteger)) )
             g.add( (start_uri, FALDO.reference, seqid_uri) )
             g.add( (region_uri, FALDO.end, end_uri) )
             g.add( (end_uri, RDF.type, FALDO.ExactPosition) )
             g.add( (end_uri, RDF.type, strand_uri) )
-            g.add( (end_uri, RDFS.label, Literal('chromosome {0}:*-{1}'.format(feature.seqid, feature.end))) )
+            g.add( (end_uri, RDFS.label, Literal('chromosome {0}:*-{1}'.format(chrom, feature.end))) )
             g.add( (end_uri, FALDO.position, Literal(feature.end, datatype=XSD.positiveInteger)) )
             g.add( (end_uri, FALDO.reference, seqid_uri) )
-            # TODO: phase info is mandatory for CDS feature types but can't find a corresponding ontology term
+            # Note: phase info is mandatory for CDS feature types but can't find a corresponding ontological term
 
             # add parent-child relationships between features to graph
             for child in db.children(feature, level=1):
                 child_feature_id = normalize_feature_id(child.id)
                 child_feature_type = amend_feature_type(child.featuretype)
                 child_feature_uri = URIRef(os.path.join(genome_uri, child_feature_type, child_feature_id))
-                g.add( (feature_uri, OBO.SO_has_part, child_feature_uri) ) # use the inverse of part_of
+                g.add( (feature_uri, SO.has_part, child_feature_uri) ) # use the inverse of part_of
 
                 if feature_type == 'gene' and child_feature_type == 'prim_transcript':
-                    g.add( (feature_uri, OBO.SO_transcribed_to, child_feature_uri) )
+                    g.add( (feature_uri, SO.transcribed_to, child_feature_uri) )
 
         except KeyError:
             pass
