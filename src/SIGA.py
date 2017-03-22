@@ -224,21 +224,13 @@ def triplify(db, rdf_format, config):
     #   prim_transcript -> SO_0000120 refers to a protein-coding primary (unprocessed) transcript
     #   mRNA            -> SO_0000234 refers to a mature transcript
     #
-    feature_onto_class = {
-        'genome'          : OBO.SO_0001026,
-        'chromosome'      : OBO.SO_0000340,
-        'gene'            : OBO.SO_0001217,
-        'prim_transcript' : OBO.SO_0000120,
-        'mRNA'            : OBO.SO_0000234,
-        'CDS'             : OBO.SO_0000316,
-        'exon'            : OBO.SO_0000147,
-        'intron'          : OBO.SO_0000188,
-        'five_prime_UTR'  : OBO.SO_0000204,
-        'three_prime_UTR' : OBO.SO_0000205,
-        'polyA_site'      : OBO.SO_0000553,
-        'polyA_sequence'  : OBO.SO_0000610,
-        'variation'       : OBO.SO_0001645
-    }
+
+    feature_onto_class = {}
+    with open('../config/feature2class.ini', 'r') as inf:
+        for line in inf:
+            (k, v) = line.split()
+            feature_onto_class[k] = v
+
 
     strand_onto_class = {
         '+' : FALDO.ForwardStrandPosition,
