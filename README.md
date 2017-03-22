@@ -8,7 +8,7 @@ Its current pipeline is as follows
   <img src ="doc/SIGA.png" />
 </p>
 
-**Key features**
+## Key features ##
 - process multiple input files in GFF (versions 2 and 3)
 - genome annotations (features) stored in [SQLite](https://sqlite.org/) database and serialized as RDF graph(s) in plain text formats:
   - [XML](https://www.w3.org/TR/rdf-syntax-grammar/)
@@ -20,45 +20,62 @@ Its current pipeline is as follows
 - sequence feature locations described by [FALDO](https://github.com/JervenBolleman/FALDO)
 - parent-child feature relationships checked for referential integrity
 
-**Installation**
+## Installation ##
 
-`virtualenv sigaenv`
+Install and activate virtualenv
 
-`source sigaenv/bin/activate`
+    virtualenv sigaenv
+    source sigaenv/bin/activate
 
-`pip install -r requirements.txt`
+Use `requirements.txt` from repository to update the virtual env with the necessary packages:
+
+    pip install -r requirements.txt
+
+
+## How to use ##
 
 **Example data**
 
-`cd examples`
+The sample genome annotations are located in the `examples` folder
 
-or download the latest genome annotations for tomato (ITAG v2.4) or potato (PGSC v4.03)
+    cd examples
 
-`wget ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3`
+Alternatively, one can download the latest genome annotations for tomato (ITAG v2.4) 
 
-`wget http://solanaceae.plantbiology.msu.edu/data/PGSC_DM_V403_genes.gff.zip`
+    wget ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3
+
+or potato (PGSC v4.03)
+
+    wget http://solanaceae.plantbiology.msu.edu/data/PGSC_DM_V403_genes.gff.zip
+
 
 **Example usage**
 
-`cd src`
+    cd src
 
 Generate RDF triples in Turtle format (default) from a GFF file in two steps.
 
-GFF to DB: `python SIGA.py db -rV ITAG2.4_gene_models.gff3`
+1. GFF to DB: 
 
-DB to RDF:
-<pre><code>
-python SIGA.py rdf \
--b https://solgenomics.net/ \
--c http://orcid.org/0000-0003-1711-7961 \
--s ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3 \
--n "Solanum lycopersicum" \
--t 4081 ITAG2.4_gene_models.db
-</code></pre>
+    ```
+    python SIGA.py db -rV ../examples/ITAG2.4_gene_models.gff3
+    ```
 
-or with a _config.ini_ file
+2. DB to RDF:
 
-`python SIGA.py rdf -C config.ini ITAG2.4_gene_models.db`
+    ```
+    python SIGA.py rdf \
+    -b https://solgenomics.net/ \
+    -c http://orcid.org/0000-0003-1711-7961 \
+    -s ftp://ftp.solgenomics.net/genomes/Solanum_lycopersicum/annotation/ITAG2.4_release/ITAG2.4_gene_models.gff3 \
+    -n "Solanum lycopersicum" \
+    -t 4081 ITAG2.4_gene_models.db
+    ```
+
+    or with a _config.ini_ file
+    ```
+    python SIGA.py rdf -C config.ini ../examples/ITAG2.4_gene_models.db
+    ```
 
 Summary of I/O files:
 
