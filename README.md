@@ -110,3 +110,6 @@ Count imported triples:
 rdfproc ITAG2.4_gene_models parse ITAG2.4_gene_models.ttl turtle
 rdfproc tomato_QTLs serialize turtle
 ```
+
+## Licence ##
+The software is released under Apache License 2.0 licence.
