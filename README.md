@@ -139,6 +139,7 @@ DB.DBA.VT_INC_INDEX_DB_DBA_RDF_OBJ() ;
 
 Note: For loading a single data file one could use the following command:
 
+
 ```
 SPARQL LOAD "file:///mydir/ITAG2.4_gene_models.ttl" INTO "https://solgenomics.net/genome/Solanum_lycopersicum" ;
 ```
