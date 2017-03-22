@@ -139,7 +139,6 @@ DB.DBA.VT_INC_INDEX_DB_DBA_RDF_OBJ() ;
 
 Note: For loading a single data file one could use the following command:
 
-
 ```
 SPARQL LOAD "file:///mydir/ITAG2.4_gene_models.ttl" INTO "https://solgenomics.net/genome/Solanum_lycopersicum" ;
 ```
@@ -164,8 +163,7 @@ rdfproc tomato_QTLs serialize turtle
 
 ## How to cite ##
 
-Please, use the following to cite SIGA in the scientific publication:
-
+Please, refer to _SIGA.py_ in scientific publications by this persistent identifier:
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.30554.svg)](https://doi.org/10.5281/zenodo.30554)
 
