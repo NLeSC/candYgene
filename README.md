@@ -3,6 +3,9 @@
 *SIGA.py* is a command-line tool to generate *Semantically Interoperable Genome Annotations* from
 [GFF](https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md) files according to the Resource Description Framework ([RDF](https://www.w3.org/TR/rdf11-concepts/)) specification.
 
+
+![Screenshot](doc/SIGA.png)
+
 **Key features**
 - process multiple input files in GFF (versions 2 and 3)
 - genome annotations (features) stored in [SQLite](https://sqlite.org/) database and serialized as RDF graph(s) in plain text formats:
