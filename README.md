@@ -137,5 +137,13 @@ rdfproc ITAG2.4_gene_models parse ITAG2.4_gene_models.ttl turtle
 rdfproc tomato_QTLs serialize turtle
 ```
 
+## How to cite ##
+
+Please, use the following to cite SIGA in the scientific publication:
+
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.30554.svg)](https://doi.org/10.5281/zenodo.30554)
+
+
 ## Licence ##
 The software is released under Apache License 2.0 licence.
