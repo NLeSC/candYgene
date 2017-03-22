@@ -26,6 +26,8 @@ RUN apt-get update && apt-get install -y \
 ARG VOS_VERSION=stable/7
 ARG VOS_PREFIX=/usr/local/virtuoso-opensource
 ARG VOS_MAXROWS=100000
+ARG VOS_MAXVECSZ=3000000
+ARG VOS_ADJVECSZ=1
 
 # compile & install Virtuoso including serveral VAD packages
 WORKDIR /tmp
@@ -44,14 +46,16 @@ RUN rm -fr virtuoso-opensource
 # add Virtuoso binaries to PATH
 ENV PATH=${VOS_PREFIX}/bin:${PATH}
 
-# add volume for data sharing
+# add volume for file sharing
 ENV VOS_SHARE=/tmp/share
 VOLUME ${VOS_SHARE}
 
-# append volume to DirsAllowed and/or set ResultSetMaxRows in Virtuoso config file
+# modify Virtuoso config file
 ENV VOS_CONFIG=${VOS_PREFIX}/var/lib/virtuoso/db/virtuoso.ini
 RUN sed -i "/DirsAllowed/ s:$:,${VOS_SHARE}:" ${VOS_CONFIG}
-RUN sed -i "/ResultSetMaxRows/ s:[0-9]*$:${VOS_MAXROWS}:" ${VOS_CONFIG}
+RUN sed -i "/ResultSetMaxRows/ s:=\s*[0-9]*:= ${VOS_MAXROWS}:" ${VOS_CONFIG}
+RUN sed -i "/MaxVectorSize/ s:=\s*[0-9]*:= ${VOS_MAXVECSZ}:" ${VOS_CONFIG}
+RUN sed -i "/AdjustVectorSize/ s:=\s*[0-9]*:= ${VOS_ADJVECSZ}:" ${VOS_CONFIG}
 WORKDIR ${VOS_SHARE}
 
 # expose (default) Virtuoso server ports
