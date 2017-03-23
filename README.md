@@ -24,6 +24,15 @@
 - sequence feature locations described by [FALDO](https://github.com/JervenBolleman/FALDO)
 - parent-child feature relationships checked for referential integrity
 
+## Software Requirement ##
+
+    Python 2.7
+    docopt 0.6.2
+    RDFLib 4.2.2
+    gffutils (https://github.com/arnikz/gffutils)
+    RDF store (e.g. Virtuoso or Berkeley DB) to ingest and query data using SPARQL
+
+
 ## Installation ##
 
 Install and activate virtualenv

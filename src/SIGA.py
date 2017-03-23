@@ -94,6 +94,15 @@ def read_config_file(fname):
             config[section][attr] = val
     return config
 
+def file_to_dict(fname):
+    """Small utility function that reads entries from external file, separated by space-related delimiter and returns dictionary."""
+    new_dict = {}
+    with open(fname, 'r') as inf:
+        for line in inf:
+            (key, val) = line.split()
+            new_dict[key] = val
+    return new_dict
+
 
 def normalize_filext(s):
     """Prefix file extension with a dot '.' if not done already."""
@@ -224,21 +233,9 @@ def triplify(db, rdf_format, config):
     #   prim_transcript -> SO_0000120 refers to a protein-coding primary (unprocessed) transcript
     #   mRNA            -> SO_0000234 refers to a mature transcript
     #
-    feature_onto_class = {
-        'genome'          : OBO.SO_0001026,
-        'chromosome'      : OBO.SO_0000340,
-        'gene'            : OBO.SO_0001217,
-        'prim_transcript' : OBO.SO_0000120,
-        'mRNA'            : OBO.SO_0000234,
-        'CDS'             : OBO.SO_0000316,
-        'exon'            : OBO.SO_0000147,
-        'intron'          : OBO.SO_0000188,
-        'five_prime_UTR'  : OBO.SO_0000204,
-        'three_prime_UTR' : OBO.SO_0000205,
-        'polyA_site'      : OBO.SO_0000553,
-        'polyA_sequence'  : OBO.SO_0000610,
-        'variation'       : OBO.SO_0001645
-    }
+
+    feature_onto_class = file_to_dict('../config/feature2class.ini')
+
 
     strand_onto_class = {
         '+' : FALDO.ForwardStrandPosition,
