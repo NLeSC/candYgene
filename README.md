@@ -30,8 +30,8 @@
     docopt 0.6.2
     RDFLib 4.2.2
     gffutils (https://github.com/arnikz/gffutils)
-    FeatureDB or SPARQL
-    
+    RDF store (e.g. Virtuoso or Berkeley DB) to ingest and query data using SPARQL
+
 
 ## Installation ##
 
