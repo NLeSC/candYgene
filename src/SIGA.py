@@ -62,7 +62,7 @@ import gffutils as gff
 import sqlite3 as sql
 
 __author__  = 'Arnold Kuzniar'
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 __status__  = 'alpha'
 __license__ = 'Apache License, Version 2.0'
 
@@ -100,7 +100,7 @@ def file_to_dict(fname):
     with open(fname, 'r') as inf:
         for line in inf:
             (key, val) = line.split()
-            new_dict[key] = val
+            new_dict[key] = val.replace(':', '_')
     return new_dict
 
 
@@ -180,12 +180,11 @@ def get_feature_attrs(ft):
 
 
 def amend_feature_type(ft):
-    """Change the original feature type to correct or more specific type
-       according to the DDBJ/ENA/GenBank Feature Table Definition.
+    """Change the original genetic feature type to a correct or more specific
+       type according to the Feature Table Definition [2]. For example, 'match'
+       or 'match_part' feature types are sometimes used instead of 'variation'
+       to indicate polymorphic sites.
     """
-    # TODO: add mappings to a config file
-    # 'match' or 'match_part' features are sometimes (mis)used to indicate polymorphic sites
-    # instead of using the 'variation' key according to [2].
     feature_types = dict(
         mRNA = 'prim_transcript',
         match = 'variation',
@@ -236,7 +235,6 @@ def triplify(db, rdf_format, config):
 
     feature_onto_class = file_to_dict('../config/feature2class.ini')
 
-
     strand_onto_class = {
         '+' : FALDO.ForwardStrandPosition,
         '-' : FALDO.ReverseStrandPosition,
@@ -248,7 +246,7 @@ def triplify(db, rdf_format, config):
     genome_uri = URIRef(os.path.join(base_uri, 'genome', species_name.replace(' ', '_')))
     taxon_uri = OBO.term('NCBITaxon_%d' % taxon_id)
 
-    g.add( (genome_uri, RDF.type, feature_onto_class['genome']) )
+    g.add( (genome_uri, RDF.type, OBO.term(feature_onto_class['genome'])) )
     g.add( (genome_uri, RDF.type, DCMITYPE.Dataset) )
     g.add( (genome_uri, RDFS.label, Literal('genome of {0}'.format(species_name), datatype=XSD.string)) )
     g.add( (genome_uri, DCTERMS.created, Literal(datetime.now().strftime("%Y-%m-%d"), datatype=XSD.date )) )
@@ -268,7 +266,7 @@ def triplify(db, rdf_format, config):
             strand_uri = strand_onto_class[feature.strand]
             feature_id = normalize_feature_id(feature.id)
             feature_type = amend_feature_type(feature.featuretype)
-            feature_type_uri = URIRef(feature_onto_class[feature_type])
+            feature_type_uri = OBO.term(feature_onto_class[feature_type])
             feature_uri = URIRef(os.path.join(genome_uri, feature_type, feature_id))
             seqid_uri = URIRef(os.path.join(genome_uri, 'chromosome', chrom))
             region_uri = URIRef('{0}#{1}-{2}'.format(seqid_uri, feature.start, feature.end))
@@ -277,7 +275,7 @@ def triplify(db, rdf_format, config):
 
             # add genome and chromosome info to graph
             # Note: the assumption is that the seqid field refers to chromosome
-            g.add( (seqid_uri, RDF.type, feature_onto_class['chromosome']) )
+            g.add( (seqid_uri, RDF.type, OBO.term(feature_onto_class['chromosome'])) )
             g.add( (seqid_uri, RDFS.label, Literal('chromosome {0}'.format(chrom), datatype=XSD.string)) )
             g.add( (seqid_uri, SO.part_of, genome_uri) )
 
